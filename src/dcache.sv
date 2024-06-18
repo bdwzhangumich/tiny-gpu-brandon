@@ -40,23 +40,46 @@ module dcache #(
         READ_RELAYING = 3'b100,
         WRITE_RELAYING = 3'b101;
 
-    localparam TAG_LENGTH = ADDR_BITS-$clog2(NUM_BLOCKS/NUM_WAYS)-$clog2(CACHE_BLOCK_SIZE);
+    localparam  TAG_LENGTH = ADDR_BITS-$clog2(NUM_BLOCKS/NUM_WAYS)-$clog2(CACHE_BLOCK_SIZE),
+                NUM_SETS_PER_BANK = NUM_BLOCKS/NUM_BANKS/NUM_WAYS;
 
-    // each set is confined to one bank, taking up the [NUM_WAYS*(set_index+1)-1:NUM_WAYS*set_index] entries in its bank
-    reg [TAG_LENGTH-1:0] tag_array [NUM_BANKS-1:0][NUM_BLOCKS/NUM_BANKS-1:0];
-    reg [CACHE_BLOCK_SIZE*8-1:0] banks [NUM_BANKS-1:0][NUM_BLOCKS/NUM_BANKS-1:0];
-    // TODO: dirty bits and other bookkeeping
+    initial begin
+        assert(NUM_WAYS <= NUM_BLOCKS/NUM_BANKS) // this design requires each set fits inside a bank
+    end
 
-    wire [TAG_LENGTH-1:0] tags [NUM_CONSUMERS-1:0];
-    wire [$clog2(NUM_BLOCKS/NUM_WAYS):0] set_indexes [NUM_CONSUMERS-1:0];
+    // each set is confined to one bank
+    reg valids [NUM_BANKS-1:0][NUM_SETS_PER_BANK-1:0][NUM_WAYS-1:0];
+    reg dirtys [NUM_BANKS-1:0][NUM_SETS_PER_BANK-1:0][NUM_WAYS-1:0];
+    reg [TAG_LENGTH-1:0] tag_array [NUM_BANKS-1:0][NUM_SETS_PER_BANK-1:0][NUM_WAYS-1:0];
+    reg [CACHE_BLOCK_SIZE*8-1:0] banks [NUM_BANKS-1:0][NUM_SETS_PER_BANK-1:0][NUM_WAYS-1:0];
+    // TODO: eviction logic
+
+    // indexes
+    wire [ADDR_BITS-TAG_LENGTH-1:0] address_after_tag [NUM_CONSUMERS-1:0];
     wire [$clog2(NUM_BANKS)-1:0] bank_indexes [NUM_CONSUMERS-1:0];
-    wire in_cache [NUM_CONSUMERS-1:0];
+    wire [$clog2(NUM_SETS_PER_BANK)-1:0] set_indexes [NUM_CONSUMERS-1:0];
+    wire [$clog2(NUM_WAYS)-1:0] entry_indexes [NUM_CONSUMERS-1:0];
+
+    // tag search
+    wire [TAG_LENGTH-1:0] tags [NUM_CONSUMERS-1:0];
+    wire tag_matches [NUM_CONSUMERS-1:0][NUM_WAYS-1:0];
+
+    for (genvar i = 0; i < NUM_CONSUMERS; i++) begin
+        assign address_after_tag[i] = (consumer_read_valid[i] & consumer_read_address[i]) | (consumer_write_valid[i] & consumer_write_address[i]);
+        assign bank_indexes[i] = address_after_tag[i][ADDR_BITS-TAG_LENGTH-1 -: $clog2(NUM_BANKS)];
+        assign set_indexes[i] = address_after_tag[i][$clog2(NUM_WAYS)+$clog2(CACHE_BLOCK_SIZE) +: $clog(NUM_SETS_PER_BANK)];
+        assign entry_indexes[i] = address_after_tag[i][$clog2(CACHE_BLOCK_SIZE) +: $clog2(NUM_WAYS)];
+    end
 
     for (genvar i = 0; i < NUM_CONSUMERS; i++) begin
         assign tags[i] = ((consumer_read_valid[i] & consumer_read_address[i]) | (consumer_write_valid[i] & consumer_write_address[i]))[ADDR_BITS-1:ADDR_BITS-TAG_LENGTH];
-        assign set_indexes[i] = ((consumer_read_valid[i] & consumer_read_address[i]) | (consumer_write_valid[i] & consumer_write_address[i]))[ADDR_BITS-TAG_LENGTH-1:$clog2(CACHE_BLOCK_SIZE)];
-        assign bank_indexes[i] = set_indexes[i] % NUM_BANKS;
+        for (genvar j = 0; j < NUM_WAYS; j++) begin
+            assign tag_matches[i][j] = valids[bank_indexes][set_indexes[i]][j] && tags[i] == tag_array[bank_indexes[i]][set_indexes[i]][j];
+        end
     end
+
+    // TODO: return value on match for loads and write value for stores
+    // TODO: handle cache miss by forwarding request to dcontroller
 
     always @(posedge clk) begin
         if (reset) begin 
