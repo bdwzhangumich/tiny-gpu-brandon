@@ -6,10 +6,10 @@ module dcache #(
     parameter DATA_BITS = 8,
     parameter NUM_CONSUMERS = 8, // The number of consumers accessing memory through this controller
     parameter NUM_CHANNELS = 8,  // The number of concurrent channels available to send requests to controller
-    parameter CACHE_BLOCK_SIZE = 1, // The number of bytes each cache block should be  
     parameter NUM_BLOCKS = 2, // The number of blocks in the cache
     parameter NUM_BANKS = 2, // The number of banks in the cache
     parameter NUM_WAYS = 1, // The associativity of the cache
+    parameter CACHE_BLOCK_SIZE = 1, // The number of bytes each cache block should be
 ) (
     input wire clk,
     input wire reset,
@@ -40,8 +40,13 @@ module dcache #(
         READ_RELAYING = 3'b100,
         WRITE_RELAYING = 3'b101;
 
-    localparam  TAG_LENGTH = ADDR_BITS-$clog2(NUM_BLOCKS/NUM_WAYS)-$clog2(CACHE_BLOCK_SIZE),
-                NUM_SETS_PER_BANK = NUM_BLOCKS/NUM_BANKS/NUM_WAYS;
+    localparam  NUM_SETS_PER_BANK = NUM_BLOCKS/NUM_BANKS/NUM_WAYS,
+                TAG_LENGTH = ADDR_BITS-$clog2(NUM_BLOCKS/NUM_WAYS)-$clog2(CACHE_BLOCK_SIZE),
+                BANK_INDEX_LENGTH = NUM_BANKS > 1 ? clog2(NUM_BANKS) : 1,
+                SET_INDEX_LENGTH = NUM_SETS_PER_BANK > 1 ? clog2(NUM_SETS_PER_BANK) : 1,
+                WAY_INDEX_LENGTH = NUM_WAYS > 1 ? clog2(NUM_WAYS) : 1,
+                BLOCK_INDEX_LENGTH = CACHE_BLOCK_SIZE > 1 ? clog2(CACHE_BLOCK_SIZE) : 1
+                ;
 
     initial begin
         assert(NUM_WAYS <= NUM_BLOCKS/NUM_BANKS) // this design requires each set fits inside a bank
@@ -56,9 +61,10 @@ module dcache #(
 
     // indexes
     wire [ADDR_BITS-TAG_LENGTH-1:0] address_after_tag [NUM_CONSUMERS-1:0];
-    wire [$clog2(NUM_BANKS)-1:0] bank_indexes [NUM_CONSUMERS-1:0];
-    wire [$clog2(NUM_SETS_PER_BANK)-1:0] set_indexes [NUM_CONSUMERS-1:0];
-    wire [$clog2(NUM_WAYS)-1:0] entry_indexes [NUM_CONSUMERS-1:0];
+    wire [BANK_INDEX_LENGTH-1:0] bank_indexes [NUM_CONSUMERS-1:0];
+    wire [SET_INDEX_LENGTH-1:0] set_indexes [NUM_CONSUMERS-1:0];
+    wire [WAY_INDEX_LENGTH-1:0] way_indexes [NUM_CONSUMERS-1:0];
+    wire [BLOCK_INDEX_LENGTH-1:0] block_offset [NUM_CONSUMERS-1:0];
 
     // tag search
     wire [TAG_LENGTH-1:0] tags [NUM_CONSUMERS-1:0];
@@ -66,9 +72,10 @@ module dcache #(
 
     for (genvar i = 0; i < NUM_CONSUMERS; i++) begin
         assign address_after_tag[i] = (consumer_read_valid[i] & consumer_read_address[i]) | (consumer_write_valid[i] & consumer_write_address[i]);
-        assign bank_indexes[i] = address_after_tag[i][ADDR_BITS-TAG_LENGTH-1 -: $clog2(NUM_BANKS)];
-        assign set_indexes[i] = address_after_tag[i][$clog2(NUM_WAYS)+$clog2(CACHE_BLOCK_SIZE) +: $clog(NUM_SETS_PER_BANK)];
-        assign entry_indexes[i] = address_after_tag[i][$clog2(CACHE_BLOCK_SIZE) +: $clog2(NUM_WAYS)];
+        assign bank_indexes[i] = NUM_BANKS > 1 ? address_after_tag[i][ADDR_BITS-TAG_LENGTH-1 -: $clog2(NUM_BANKS)] : 0;
+        assign set_indexes[i] = NUM_SETS_PER_BANK > 1 ? address_after_tag[i][$clog2(NUM_WAYS)+$clog2(CACHE_BLOCK_SIZE) +: $clog(NUM_SETS_PER_BANK)] : 0;
+        assign way_indexes[i] = NUM_WAYS > 1 ? address_after_tag[i][$clog2(CACHE_BLOCK_SIZE) +: $clog2(NUM_WAYS)] : 0;
+        assign block_offset[i] = CACHE_BLOCK_SIZE > 1 ? address_after_tag[i] : 0;
     end
 
     for (genvar i = 0; i < NUM_CONSUMERS; i++) begin
