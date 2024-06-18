@@ -62,7 +62,7 @@ module dcache #(
 
     // tag search
     wire [TAG_LENGTH-1:0] tags [NUM_CONSUMERS-1:0];
-    wire tag_matches [NUM_CONSUMERS-1:0][NUM_WAYS-1:0];
+    wire tag_hits [NUM_CONSUMERS-1:0][NUM_WAYS-1:0];
 
     for (genvar i = 0; i < NUM_CONSUMERS; i++) begin
         assign address_after_tag[i] = (consumer_read_valid[i] & consumer_read_address[i]) | (consumer_write_valid[i] & consumer_write_address[i]);
@@ -74,7 +74,7 @@ module dcache #(
     for (genvar i = 0; i < NUM_CONSUMERS; i++) begin
         assign tags[i] = ((consumer_read_valid[i] & consumer_read_address[i]) | (consumer_write_valid[i] & consumer_write_address[i]))[ADDR_BITS-1:ADDR_BITS-TAG_LENGTH];
         for (genvar j = 0; j < NUM_WAYS; j++) begin
-            assign tag_matches[i][j] = valids[bank_indexes][set_indexes[i]][j] && tags[i] == tag_array[bank_indexes[i]][set_indexes[i]][j];
+            assign tag_hits[i][j] = valids[bank_indexes][set_indexes[i]][j] && tags[i] == tag_array[bank_indexes[i]][set_indexes[i]][j];
         end
     end
 
