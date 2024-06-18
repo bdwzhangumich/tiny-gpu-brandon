@@ -5,7 +5,7 @@ module dcache #(
     parameter ADDR_BITS = 8,
     parameter DATA_BITS = 8,
     parameter NUM_CONSUMERS = 8, // The number of consumers accessing memory through this controller
-    parameter NUM_CHANNELS = 4,  // The number of concurrent channels available to send requests to global memory
+    parameter NUM_CHANNELS = 8,  // The number of concurrent channels available to send requests to controller
     parameter CACHE_BLOCK_SIZE = 1, // The number of bytes each cache block should be  
     parameter NUM_BLOCKS = 2, // The number of blocks in the cache
     parameter NUM_BANKS = 2, // The number of banks in the cache
@@ -25,14 +25,14 @@ module dcache #(
     output reg [NUM_CONSUMERS-1:0] consumer_write_ready,
 
     // Memory Interface (Data / Program)
-    output reg [NUM_CHANNELS-1:0] mem_read_valid,
-    output reg [ADDR_BITS-1:0] mem_read_address [NUM_CHANNELS-1:0],
-    input reg [NUM_CHANNELS-1:0] mem_read_ready,
-    input reg [DATA_BITS-1:0] mem_read_data [NUM_CHANNELS-1:0],
-    output reg [NUM_CHANNELS-1:0] mem_write_valid,
-    output reg [ADDR_BITS-1:0] mem_write_address [NUM_CHANNELS-1:0],
-    output reg [DATA_BITS-1:0] mem_write_data [NUM_CHANNELS-1:0],
-    input reg [NUM_CHANNELS-1:0] mem_write_ready
+    input reg [NUM_CHANNELS-1:0] controller_read_valid,
+    input reg [ADDR_BITS-1:0] controller_read_address [NUM_CHANNELS-1:0],
+    output reg [NUM_CHANNELS-1:0] controller_read_ready,
+    output reg [DATA_BITS-1:0] controller_read_data [NUM_CHANNELS-1:0],
+    input reg [NUM_CHANNELS-1:0] controller_write_valid,
+    input reg [ADDR_BITS-1:0] controller_write_address [NUM_CHANNELS-1:0],
+    input reg [DATA_BITS-1:0] controller_write_data [NUM_CHANNELS-1:0],
+    output reg [NUM_CHANNELS-1:0] controller_write_ready,
 );
     localparam IDLE = 3'b000, 
         READ_WAITING = 3'b010, 
@@ -40,10 +40,23 @@ module dcache #(
         READ_RELAYING = 3'b100,
         WRITE_RELAYING = 3'b101;
 
-    // Keep track of state for each channel and which jobs each channel is handling
-    reg [2:0] controller_state [NUM_CHANNELS-1:0];
-    reg [$clog2(NUM_CONSUMERS)-1:0] current_consumer [NUM_CHANNELS-1:0]; // Which consumer is each channel currently serving
-    reg [NUM_CONSUMERS-1:0] channel_serving_consumer; // Which channels are being served? Prevents many workers from picking up the same request.
+    localparam TAG_LENGTH = ADDR_BITS-$clog2(NUM_BLOCKS/NUM_WAYS)-$clog2(CACHE_BLOCK_SIZE);
+
+    // each set is confined to one bank, taking up the [NUM_WAYS*(set_index+1)-1:NUM_WAYS*set_index] entries in its bank
+    reg [TAG_LENGTH-1:0] tag_array [NUM_BANKS-1:0][NUM_BLOCKS/NUM_BANKS-1:0];
+    reg [CACHE_BLOCK_SIZE*8-1:0] banks [NUM_BANKS-1:0][NUM_BLOCKS/NUM_BANKS-1:0];
+    // TODO: dirty bits and other bookkeeping
+
+    wire [TAG_LENGTH-1:0] tags [NUM_CONSUMERS-1:0];
+    wire [$clog2(NUM_BLOCKS/NUM_WAYS):0] set_indexes [NUM_CONSUMERS-1:0];
+    wire [$clog2(NUM_BANKS)-1:0] bank_indexes [NUM_CONSUMERS-1:0];
+    wire in_cache [NUM_CONSUMERS-1:0];
+
+    for (genvar i = 0; i < NUM_CONSUMERS; i++) begin
+        assign tags[i] = ((consumer_read_valid[i] & consumer_read_address[i]) | (consumer_write_valid[i] & consumer_write_address[i]))[ADDR_BITS-1:ADDR_BITS-TAG_LENGTH];
+        assign set_indexes[i] = ((consumer_read_valid[i] & consumer_read_address[i]) | (consumer_write_valid[i] & consumer_write_address[i]))[ADDR_BITS-TAG_LENGTH-1:$clog2(CACHE_BLOCK_SIZE)];
+        assign bank_indexes[i] = set_indexes[i] % NUM_BANKS;
+    end
 
     always @(posedge clk) begin
         if (reset) begin 
