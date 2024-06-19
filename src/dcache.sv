@@ -44,7 +44,6 @@ module dcache #(
                 TAG_LENGTH = ADDR_BITS-$clog2(NUM_BLOCKS/NUM_WAYS)-$clog2(CACHE_BLOCK_SIZE),
                 BANK_INDEX_LENGTH = NUM_BANKS > 1 ? clog2(NUM_BANKS) : 1,
                 SET_INDEX_LENGTH = NUM_SETS_PER_BANK > 1 ? clog2(NUM_SETS_PER_BANK) : 1,
-                WAY_INDEX_LENGTH = NUM_WAYS > 1 ? clog2(NUM_WAYS) : 1,
                 BLOCK_INDEX_LENGTH = CACHE_BLOCK_SIZE > 1 ? clog2(CACHE_BLOCK_SIZE) : 1
                 ;
 
@@ -63,18 +62,20 @@ module dcache #(
     wire [ADDR_BITS-TAG_LENGTH-1:0] address_after_tag [NUM_CONSUMERS-1:0];
     wire [BANK_INDEX_LENGTH-1:0] bank_indexes [NUM_CONSUMERS-1:0];
     wire [SET_INDEX_LENGTH-1:0] set_indexes [NUM_CONSUMERS-1:0];
-    wire [WAY_INDEX_LENGTH-1:0] way_indexes [NUM_CONSUMERS-1:0];
     wire [BLOCK_INDEX_LENGTH-1:0] block_offset [NUM_CONSUMERS-1:0];
 
     // tag search
     wire [TAG_LENGTH-1:0] tags [NUM_CONSUMERS-1:0];
-    wire tag_hits [NUM_CONSUMERS-1:0][NUM_WAYS-1:0];
+    wire tag_hits [NUM_CONSUMERS-1:0][NUM_WAYS-1:0]; // bits for which ways are hits
+
+    // bank access
+    logic [$clog2(NUM_WAYS)] hit_way [NUM_CONSUMERS-1:0]; // decoded form of tag_hits
+    logic [DATA_BITS-1:0] hit_data [NUM_CONSUMERS-1:0]; // data from cache hit, or data to be written to cache hit
 
     for (genvar i = 0; i < NUM_CONSUMERS; i++) begin
         assign address_after_tag[i] = (consumer_read_valid[i] & consumer_read_address[i]) | (consumer_write_valid[i] & consumer_write_address[i]);
         assign bank_indexes[i] = NUM_BANKS > 1 ? address_after_tag[i][ADDR_BITS-TAG_LENGTH-1 -: $clog2(NUM_BANKS)] : 0;
-        assign set_indexes[i] = NUM_SETS_PER_BANK > 1 ? address_after_tag[i][$clog2(NUM_WAYS)+$clog2(CACHE_BLOCK_SIZE) +: $clog(NUM_SETS_PER_BANK)] : 0;
-        assign way_indexes[i] = NUM_WAYS > 1 ? address_after_tag[i][$clog2(CACHE_BLOCK_SIZE) +: $clog2(NUM_WAYS)] : 0;
+        assign set_indexes[i] = NUM_SETS_PER_BANK > 1 ? address_after_tag[i][$clog2(CACHE_BLOCK_SIZE) +: $clog(NUM_SETS_PER_BANK)] : 0;
         assign block_offset[i] = CACHE_BLOCK_SIZE > 1 ? address_after_tag[i] : 0;
     end
 
@@ -85,7 +86,26 @@ module dcache #(
         end
     end
 
-    // TODO: return value on match for loads and write value for stores
+    always_comb begin : bank_access
+        hit_way = 0;
+        hit_data = 0;
+        for (int i = 0; i < NUM_CONSUMERS; i++) begin
+            for (int j = 0; j < NUM_WAYS; j++) begin
+                if (tag_hits[i][j]) begin
+                    hit_way |= j;
+                end
+            end
+        end
+        for (int i = 0; i < NUM_CONSUMERS; i++) begin
+            if (consumer_read_valid[i]) begin
+                hit_data[i] = banks[bank_indexes[i]][set_indexes[i]][hit_way[i]][8*block_offset[i] +: 8];
+            end
+            else if (consumer_write_valid[i]) begin
+                hit_data[i] = consumer_write_data[i];
+            end
+        end
+    end
+
     // TODO: handle cache miss by forwarding request to dcontroller
 
     always @(posedge clk) begin
@@ -101,74 +121,20 @@ module dcache #(
             consumer_read_data <= 0;
             consumer_write_ready <= 0;
 
-            current_consumer <= 0;
-            controller_state <= 0;
-
-            channel_serving_consumer = 0;
         end else begin 
-            // For each channel, we handle processing concurrently
-            for (int i = 0; i < NUM_CHANNELS; i = i + 1) begin 
-                case (controller_state[i])
-                    IDLE: begin
-                        // While this channel is idle, cycle through consumers looking for one with a pending request
-                        for (int j = 0; j < NUM_CONSUMERS; j = j + 1) begin 
-                            if (consumer_read_valid[j] && !channel_serving_consumer[j]) begin 
-                                channel_serving_consumer[j] = 1;
-                                current_consumer[i] <= j;
-
-                                mem_read_valid[i] <= 1;
-                                mem_read_address[i] <= consumer_read_address[j];
-                                controller_state[i] <= READ_WAITING;
-
-                                // Once we find a pending request, pick it up with this channel and stop looking for requests
-                                break;
-                            end else if (consumer_write_valid[j] && !channel_serving_consumer[j]) begin 
-                                channel_serving_consumer[j] = 1;
-                                current_consumer[i] <= j;
-
-                                mem_write_valid[i] <= 1;
-                                mem_write_address[i] <= consumer_write_address[j];
-                                mem_write_data[i] <= consumer_write_data[j];
-                                controller_state[i] <= WRITE_WAITING;
-
-                                // Once we find a pending request, pick it up with this channel and stop looking for requests
-                                break;
-                            end
-                        end
-                    end
-                    READ_WAITING: begin
-                        // Wait for response from memory for pending read request
-                        if (mem_read_ready[i]) begin 
-                            mem_read_valid[i] <= 0;
-                            consumer_read_ready[current_consumer[i]] <= 1;
-                            consumer_read_data[current_consumer[i]] <= mem_read_data[i];
-                            controller_state[i] <= READ_RELAYING;
-                        end
-                    end
-                    WRITE_WAITING: begin 
-                        // Wait for response from memory for pending write request
-                        if (mem_write_ready[i]) begin 
-                            mem_write_valid[i] <= 0;
-                            consumer_write_ready[current_consumer[i]] <= 1;
-                            controller_state[i] <= WRITE_RELAYING;
-                        end
-                    end
-                    // Wait until consumer acknowledges it received response, then reset
-                    READ_RELAYING: begin
-                        if (!consumer_read_valid[current_consumer[i]]) begin 
-                            channel_serving_consumer[current_consumer[i]] = 0;
-                            consumer_read_ready[current_consumer[i]] <= 0;
-                            controller_state[i] <= IDLE;
-                        end
-                    end
-                    WRITE_RELAYING: begin 
-                        if (!consumer_write_valid[current_consumer[i]]) begin 
-                            channel_serving_consumer[current_consumer[i]] = 0;
-                            consumer_write_ready[current_consumer[i]] <= 0;
-                            controller_state[i] <= IDLE;
-                        end
-                    end
-                endcase
+            for (int i = 0; i < NUM_CONSUMERS; i++) begin 
+                if (consumer_read_valid[i] && |tag_hits[i]) begin 
+                    consumer_read_ready[i] <= 1;
+                    consumer_read_data[i] <= hit_data[i];
+                end
+                else if (consumer_write_valid[i] && |tag_hits[i]) begin 
+                    consumer_write_ready[i] <= 1;
+                    banks[bank_indexes[i]][set_indexes[i]][hit_way[i]][8*block_offset[i] +: 8] <= hit_data[i]
+                end
+                else begin
+                    consumer_read_valid[i] <= 0;
+                    consumer_write_ready[i] <= 0;
+                end
             end
         end
     end
