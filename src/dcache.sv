@@ -126,6 +126,11 @@ module dcache #(
             consumer_read_data <= 0;
             consumer_write_ready <= 0;
 
+            valids <= 0;
+            dirtys <= 0;
+            tag_array <= 0;
+            banks <= 0;
+
         end else begin 
             for (int i = 0; i < NUM_CONSUMERS; i++) begin 
                 if (consumer_read_valid[i] && |tag_hits[i]) begin 
@@ -134,7 +139,8 @@ module dcache #(
                 end
                 else if (consumer_write_valid[i] && |tag_hits[i]) begin 
                     consumer_write_ready[i] <= 1;
-                    banks[bank_indexes[i]][set_indexes[i]][hit_way[i]][8*block_offset[i] +: 8] <= hit_data[i]
+                    banks[bank_indexes[i]][set_indexes[i]][hit_way[i]][8*block_offset[i] +: 8] <= hit_data[i];
+                    dirtys[bank_indexes[i]][set_indexes[i]][hit_way[i]] <= 1;
                 end
                 else begin
                     consumer_read_ready[i] <= 0;
