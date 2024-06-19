@@ -24,7 +24,7 @@ module dcache #(
     input reg [DATA_BITS-1:0] consumer_write_data [NUM_CONSUMERS-1:0],
     output reg [NUM_CONSUMERS-1:0] consumer_write_ready,
 
-    // Memory Interface (Data / Program)
+    // Controller Interface
     input reg [NUM_CHANNELS-1:0] controller_read_valid,
     input reg [ADDR_BITS-1:0] controller_read_address [NUM_CHANNELS-1:0],
     output reg [NUM_CHANNELS-1:0] controller_read_ready,
@@ -72,6 +72,10 @@ module dcache #(
     logic [$clog2(NUM_WAYS)] hit_way [NUM_CONSUMERS-1:0]; // decoded form of tag_hits
     logic [DATA_BITS-1:0] hit_data [NUM_CONSUMERS-1:0]; // data from cache hit, or data to be written to cache hit
 
+    // cache miss
+    // only need stuff for response because, on miss, stuff is just forwarded to controller
+
+
     for (genvar i = 0; i < NUM_CONSUMERS; i++) begin
         assign address_after_tag[i] = (consumer_read_valid[i] & consumer_read_address[i]) | (consumer_write_valid[i] & consumer_write_address[i]);
         assign bank_indexes[i] = NUM_BANKS > 1 ? address_after_tag[i][ADDR_BITS-TAG_LENGTH-1 -: $clog2(NUM_BANKS)] : 0;
@@ -107,6 +111,7 @@ module dcache #(
     end
 
     // TODO: handle cache miss by forwarding request to dcontroller
+    // need to deal with eviction and write to same block on same cycle, probably by arbitrating with a next_blocks array and delaying eviction
 
     always @(posedge clk) begin
         if (reset) begin 
@@ -132,8 +137,14 @@ module dcache #(
                     banks[bank_indexes[i]][set_indexes[i]][hit_way[i]][8*block_offset[i] +: 8] <= hit_data[i]
                 end
                 else begin
-                    consumer_read_valid[i] <= 0;
+                    consumer_read_ready[i] <= 0;
                     consumer_write_ready[i] <= 0;
+
+                    controller_read_valid[i] <= consumer_read_valid[i];
+                    controller_read_address[i] <= consumer_read_address[i];
+                    controller_write_valid[i] <= consumer_write_valid[i];
+                    controller_write_address[i] <= consumer_write_address[i];
+                    controller_write_data[i] <= consumer_write_data[i];
                 end
             end
         end
