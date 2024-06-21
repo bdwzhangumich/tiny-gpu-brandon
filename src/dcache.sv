@@ -129,7 +129,7 @@ module dcache #(
         next_dirtys = dirtys;
         next_tag_array = tag_array;
         next_banks = banks;
-        next_mrus = mru;
+        next_mrus = mrus;
 
         next_controller_read_valid = 0;
         next_controller_read_address = 0;
