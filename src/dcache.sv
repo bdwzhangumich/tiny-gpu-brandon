@@ -25,14 +25,14 @@ module dcache #(
     output reg [NUM_CONSUMERS-1:0] consumer_write_ready,
 
     // Controller Interface
-    input reg [NUM_CHANNELS-1:0] controller_read_valid,
-    input reg [ADDR_BITS-1:0] controller_read_address [NUM_CHANNELS-1:0],
-    output reg [NUM_CHANNELS-1:0] controller_read_ready,
-    output reg [DATA_BITS-1:0] controller_read_data [NUM_CHANNELS-1:0],
-    input reg [NUM_CHANNELS-1:0] controller_write_valid,
-    input reg [ADDR_BITS-1:0] controller_write_address [NUM_CHANNELS-1:0],
-    input reg [DATA_BITS-1:0] controller_write_data [NUM_CHANNELS-1:0],
-    output reg [NUM_CHANNELS-1:0] controller_write_ready,
+    output reg [NUM_CONSUMERS-1:0] controller_read_valid,
+    output reg [ADDR_BITS-1:0] controller_read_address [NUM_CONSUMERS-1:0],
+    input reg [NUM_CONSUMERS-1:0] controller_read_ready,
+    input reg [DATA_BITS-1:0] controller_read_data [NUM_CONSUMERS-1:0],
+    output reg [NUM_CONSUMERS-1:0] controller_write_valid,
+    output reg [ADDR_BITS-1:0] controller_write_address [NUM_CONSUMERS-1:0],
+    output reg [DATA_BITS-1:0] controller_write_data [NUM_CONSUMERS-1:0],
+    input reg [NUM_CONSUMERS-1:0] controller_write_ready,
 );
     localparam IDLE = 3'b000, 
         READ_WAITING = 3'b010, 
@@ -51,12 +51,20 @@ module dcache #(
         assert(NUM_WAYS <= NUM_BLOCKS/NUM_BANKS) // this design requires each set fits inside a bank
     end
 
+    // cache state
     // each set is confined to one bank
     reg valids [NUM_BANKS-1:0][NUM_SETS_PER_BANK-1:0][NUM_WAYS-1:0];
     reg dirtys [NUM_BANKS-1:0][NUM_SETS_PER_BANK-1:0][NUM_WAYS-1:0];
+    reg mrus [NUM_BANKS-1:0][NUM_SETS_PER_BANK-1:0][NUM_WAYS-1:0]; // bit-plru https://en.wikipedia.org/wiki/Pseudo-LRU
     reg [TAG_LENGTH-1:0] tag_array [NUM_BANKS-1:0][NUM_SETS_PER_BANK-1:0][NUM_WAYS-1:0];
     reg [CACHE_BLOCK_SIZE*8-1:0] banks [NUM_BANKS-1:0][NUM_SETS_PER_BANK-1:0][NUM_WAYS-1:0];
-    // TODO: eviction logic
+
+    logic next_valids [NUM_BANKS-1:0][NUM_SETS_PER_BANK-1:0][NUM_WAYS-1:0];
+    logic next_dirtys [NUM_BANKS-1:0][NUM_SETS_PER_BANK-1:0][NUM_WAYS-1:0];
+    logic next_mrus [NUM_BANKS-1:0][NUM_SETS_PER_BANK-1:0][NUM_WAYS-1:0];
+    logic [TAG_LENGTH-1:0] next_tag_array [NUM_BANKS-1:0][NUM_SETS_PER_BANK-1:0][NUM_WAYS-1:0];
+    logic [CACHE_BLOCK_SIZE*8-1:0] next_banks [NUM_BANKS-1:0][NUM_SETS_PER_BANK-1:0][NUM_WAYS-1:0];
+    logic modified [NUM_BANKS-1:0][NUM_SETS_PER_BANK-1:0][NUM_WAYS-1:0]; // whether the entry was modified this cycle
 
     // indexes
     wire [ADDR_BITS-TAG_LENGTH-1:0] address_after_tag [NUM_CONSUMERS-1:0];
@@ -74,7 +82,11 @@ module dcache #(
 
     // cache miss
     // only need stuff for response because, on miss, stuff is just forwarded to controller
-
+    logic [NUM_CONSUMERS-1:0] next_controller_read_valid;
+    logic [ADDR_BITS-1:0] next_controller_read_address [NUM_CONSUMERS-1:0];
+    logic [NUM_CONSUMERS-1:0] next_controller_write_valid;
+    logic [ADDR_BITS-1:0] next_controller_write_address [NUM_CONSUMERS-1:0];
+    logic [DATA_BITS-1:0] next_controller_write_data [NUM_CONSUMERS-1:0];
 
     for (genvar i = 0; i < NUM_CONSUMERS; i++) begin
         assign address_after_tag[i] = (consumer_read_valid[i] & consumer_read_address[i]) | (consumer_write_valid[i] & consumer_write_address[i]);
@@ -90,7 +102,7 @@ module dcache #(
         end
     end
 
-    always_comb begin : bank_access
+    always_comb begin : bank_read
         hit_way = 0;
         hit_data = 0;
         for (int i = 0; i < NUM_CONSUMERS; i++) begin
@@ -110,28 +122,119 @@ module dcache #(
         end
     end
 
-    // TODO: handle cache miss by forwarding request to dcontroller
-    // need to deal with eviction and write to same block on same cycle, probably by arbitrating with a next_blocks array and delaying eviction
+    // TODO: split this module up into multiple modules?
+
+    always_comb begin : bank_write
+        next_valids = valids;
+        next_dirtys = dirtys;
+        next_tag_array = tag_array;
+        next_banks = banks;
+        next_mrus = mru;
+
+        next_controller_read_valid = 0;
+        next_controller_read_address = 0;
+        next_controller_write_valid = controller_write_valid;
+        next_controller_write_address = controller_write_address;
+        next_controller_write_data = controller_write_data;
+        for (int i = 0; i < NUM_CONSUMERS; i++) begin
+            // dont do anything if still waiting for past eviction to finish
+            if (!controller_write_valid[i] || controller_write_ready[i]) begin
+                next_controller_read_valid[i] = !consumer_read_ready[i] && !|tag_hits[i] && (consumer_read_valid[i] || consumer_read_address[i]);
+                next_controller_read_address[i] = (consumer_read_valid[i] & consumer_read_address[i]) | (consumer_write_valid[i] & consumer_write_address[i]);
+                // stop any past evictions
+                next_controller_write_valid[i] = 0;
+                next_controller_write_address[i] = 0;
+                next_controller_write_data[i] = 0;
+            end
+        end
+
+        // store hit
+        for (int i = 0; i < NUM_CONSUMERS; i++) begin 
+            if (consumer_write_valid[i] && |tag_hits[i]) begin
+                next_banks[bank_indexes[i]][set_indexes[i]][hit_way[i]][8*block_offset[i] +: 8] = hit_data[i];
+                next_dirtys[bank_indexes[i]][set_indexes[i]][hit_way[i]] = 1;
+                next_mrus[bank_indexes[i]][set_indexes[i]][hit_way[i]] = 1;
+                modified[bank_indexes[i]][set_indexes[i]][hit_way[i]] = 1;
+            end
+        end
+        // clear mrus if all 1s
+        for (int i = 0; i < NUM_BANKS; i++)
+            for (int j = 0; j < NUM_SETS_PER_BANK; j++)
+                if (&next_mrus[i][j]) next_mrus[i][j] = 0;
+        // write data from memory controller
+        for (int i = 0; i < NUM_CONSUMERS; i++) begin 
+            if ((consumer_read_valid[i] | consumer_write_valid[i]) && controller_read_ready[i]) begin // check if lsu is requesting and controller is ready
+                if (&next_valids[bank_indexes[i]][set_indexes[i]]) begin
+                    // eviction
+                    for (int j = 0; j < NUM_WAYS; j++) begin
+                        if (!modified[bank_indexes[i]][set_indexes[i]][j] && !next_mrus[bank_indexes[i]][set_indexes[i]][j]) begin
+                            next_valids[bank_indexes[i]][set_indexes[i]][j] = 0;
+                            modified[bank_indexes[i]][set_indexes[i]][j] = 1;
+                            if (next_dirtys[bank_indexes[i]][set_indexes[i]][j]) begin
+                                next_dirtys[bank_indexes[i]][set_indexes[i]][j] = 0;
+                                // write back to memory
+                                next_controller_write_valid[i] = 1;
+                                next_controller_write_address[i] = {next_tag_array[bank_indexes[i]][set_indexes[i]][j], bank_indexes[i], set_indexes[i], {$clog2(CACHE_BLOCK_SIZE){1'b0}}};
+                                next_controller_write_data[i] = next_banks[bank_indexes[i]][set_indexes[i]][j];
+                                next_controller_read_valid[i] = 0; // prevent reading and writing at same time on same interface
+                            end
+                            break;
+                        end
+                    end
+                end
+                // write to open block, or do nothing if no blocks could be evicted and set is still full
+                for (int j = 0; j < NUM_WAYS; j++) begin
+                    if (!next_valids[bank_indexes[i]][set_indexes[i]][j]) begin
+                        next_valids[bank_indexes[i]][set_indexes[i]][j] = 1;
+                        next_mrus[bank_indexes[i]][set_indexes[i]][j] = 1;
+                        next_tag_array[bank_indexes[i]][set_indexes[i]][j] = (consumer_read_valid[i] & consumer_read_address[i]) | (consumer_write_valid[i] & consumer_write_address[i])[ADDR_BITS-1 -: TAG_LENGTH];
+                        next_banks[bank_indexes[i]][set_indexes[i]][j] = controller_read_data[i];
+                        if (consumer_write_valid[i]) begin
+                            // write new data from lsu
+                            next_banks[bank_indexes[i]][set_indexes[i]][j][8*block_offset[i] +: 8] = consumer_write_data[i];
+                            next_dirtys[bank_indexes[i]][set_indexes[i]][j] = 1;
+                        end
+                        next_controller_read_valid[i] = 0;
+                        break;
+                    end
+                end
+            end
+        end
+        // clear mrus if all 1s
+        for (int i = 0; i < NUM_BANKS; i++)
+            for (int j = 0; j < NUM_SETS_PER_BANK; j++)
+                if (&next_mrus[i][j]) next_mrus[i][j] = 0;
+    end
 
     always @(posedge clk) begin
         if (reset) begin 
-            mem_read_valid <= 0;
-            mem_read_address <= 0;
-
-            mem_write_valid <= 0;
-            mem_write_address <= 0;
-            mem_write_data <= 0;
-
             consumer_read_ready <= 0;
             consumer_read_data <= 0;
             consumer_write_ready <= 0;
 
+            controller_write_valid <= 0;
+            controller_write_address <= 0;
+            controller_write_data <= 0;
+
             valids <= 0;
             dirtys <= 0;
+            mrus <= 0;
             tag_array <= 0;
             banks <= 0;
 
         end else begin 
+            valids <= next_valids;
+            dirtys <= next_dirtys;
+            mrus <= next_mrus;
+            tag_array <= next_tag_array;
+            banks <= next_banks;
+
+            controller_read_valid <= next_controller_read_valid;
+            controller_read_address <= next_controller_read_address;
+            controller_write_valid <= next_controller_write_valid;
+            controller_write_address <= next_controller_write_address;
+            controller_write_data <= next_controller_write_data;
+
             for (int i = 0; i < NUM_CONSUMERS; i++) begin 
                 if (consumer_read_valid[i] && |tag_hits[i]) begin 
                     consumer_read_ready[i] <= 1;
@@ -139,18 +242,10 @@ module dcache #(
                 end
                 else if (consumer_write_valid[i] && |tag_hits[i]) begin 
                     consumer_write_ready[i] <= 1;
-                    banks[bank_indexes[i]][set_indexes[i]][hit_way[i]][8*block_offset[i] +: 8] <= hit_data[i];
-                    dirtys[bank_indexes[i]][set_indexes[i]][hit_way[i]] <= 1;
                 end
                 else begin
                     consumer_read_ready[i] <= 0;
                     consumer_write_ready[i] <= 0;
-
-                    controller_read_valid[i] <= consumer_read_valid[i];
-                    controller_read_address[i] <= consumer_read_address[i];
-                    controller_write_valid[i] <= consumer_write_valid[i];
-                    controller_write_address[i] <= consumer_write_address[i];
-                    controller_write_data[i] <= consumer_write_data[i];
                 end
             end
         end
