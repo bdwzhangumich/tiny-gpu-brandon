@@ -11,6 +11,10 @@ module gpu #(
     parameter DATA_MEM_ADDR_BITS = 8,        // Number of bits in data memory address (256 rows)
     parameter DATA_MEM_DATA_BITS = 8,        // Number of bits in data memory value (8 bit data)
     parameter DATA_MEM_NUM_CHANNELS = 4,     // Number of concurrent channels for sending requests to data memory
+    parameter NUM_BLOCKS = 2, // The number of blocks in the cache
+    parameter NUM_BANKS = 2, // The number of banks in the cache
+    parameter NUM_WAYS = 1, // The associativity of the cache
+    parameter CACHE_BLOCK_SIZE = 1, // The number of bytes each cache block should be
     parameter PROGRAM_MEM_ADDR_BITS = 8,     // Number of bits in program memory address (256 rows)
     parameter PROGRAM_MEM_DATA_BITS = 16,    // Number of bits in program memory value (16 bit instruction)
     parameter PROGRAM_MEM_NUM_CHANNELS = 1,  // Number of concurrent channels for sending requests to program memory
@@ -54,7 +58,7 @@ module gpu #(
     reg [7:0] core_block_id [NUM_CORES-1:0];
     reg [$clog2(THREADS_PER_BLOCK):0] core_thread_count [NUM_CORES-1:0];
 
-    // LSU <> Data Memory Controller Channels
+    // LSU <> Data Cache Controller Channels
     localparam NUM_LSUS = NUM_CORES * THREADS_PER_BLOCK;
     reg [NUM_LSUS-1:0] lsu_read_valid;
     reg [DATA_MEM_ADDR_BITS-1:0] lsu_read_address [NUM_LSUS-1:0];
@@ -64,6 +68,16 @@ module gpu #(
     reg [DATA_MEM_ADDR_BITS-1:0] lsu_write_address [NUM_LSUS-1:0];
     reg [DATA_MEM_DATA_BITS-1:0] lsu_write_data [NUM_LSUS-1:0];
     reg [NUM_LSUS-1:0] lsu_write_ready;
+
+    // Data Cache <> Data Memory Controller Channels
+    reg [DATA_MEM_NUM_CHANNELS-1:0] data_cache_read_valid;
+    reg [DATA_MEM_ADDR_BITS-1:0] data_cache_read_address [DATA_MEM_NUM_CHANNELS-1:0];
+    reg [DATA_MEM_NUM_CHANNELS-1:0] data_cache_read_ready;
+    reg [DATA_MEM_DATA_BITS-1:0] data_cache_read_data [DATA_MEM_NUM_CHANNELS-1:0];
+    reg [DATA_MEM_NUM_CHANNELS-1:0] data_cache_write_valid;
+    reg [DATA_MEM_ADDR_BITS-1:0] data_cache_write_address [DATA_MEM_NUM_CHANNELS-1:0];
+    reg [DATA_MEM_DATA_BITS-1:0] data_cache_write_data [DATA_MEM_NUM_CHANNELS-1:0];
+    reg [DATA_MEM_NUM_CHANNELS-1:0] data_cache_write_ready;
 
     // Fetcher <> Program Memory Controller Channels
     localparam NUM_FETCHERS = NUM_CORES;
@@ -82,13 +96,17 @@ module gpu #(
         .thread_count(thread_count)
     );
 
-    // Data Memory Controller
-    controller #(
+    // Data Cache
+    dcache #(
         .ADDR_BITS(DATA_MEM_ADDR_BITS),
         .DATA_BITS(DATA_MEM_DATA_BITS),
         .NUM_CONSUMERS(NUM_LSUS),
-        .NUM_CHANNELS(DATA_MEM_NUM_CHANNELS)
-    ) data_memory_controller (
+        .NUM_CHANNELS(DATA_MEM_NUM_CHANNELS),
+        .NUM_BLOCKS(NUM_BLOCKS),
+        .NUM_BANKS(NUM_BANKS),
+        .NUM_WAYS(NUM_WAYS),
+        .CACHE_BLOCK_SIZE(CACHE_BLOCK_SIZE)
+    ) data_cache (
         .clk(clk),
         .reset(reset),
 
@@ -100,6 +118,35 @@ module gpu #(
         .consumer_write_address(lsu_write_address),
         .consumer_write_data(lsu_write_data),
         .consumer_write_ready(lsu_write_ready),
+
+        .controller_read_valid(data_cache_read_valid),
+        .controller_read_address(data_cache_read_address),
+        .controller_read_ready(data_cache_read_ready),
+        .controller_read_data(data_cache_read_data),
+        .controller_write_valid(data_cache_write_valid),
+        .controller_write_address(data_cache_write_address),
+        .controller_write_data(data_cache_write_data),
+        .controller_write_ready(data_cache_write_ready)
+    );
+
+    // Data Memory Controller
+    controller #(
+        .ADDR_BITS(DATA_MEM_ADDR_BITS),
+        .DATA_BITS(DATA_MEM_DATA_BITS),
+        .NUM_CONSUMERS(NUM_LSUS),
+        .NUM_CHANNELS(DATA_MEM_NUM_CHANNELS)
+    ) data_memory_controller (
+        .clk(clk),
+        .reset(reset),
+
+        .consumer_read_valid(data_cache_read_valid),
+        .consumer_read_address(data_cache_read_address),
+        .consumer_read_ready(data_cache_read_ready),
+        .consumer_read_data(data_cache_read_data),
+        .consumer_write_valid(data_cache_write_valid),
+        .consumer_write_address(data_cache_write_address),
+        .consumer_write_data(data_cache_write_data),
+        .consumer_write_ready(data_cache_write_ready),
 
         .mem_read_valid(data_mem_read_valid),
         .mem_read_address(data_mem_read_address),

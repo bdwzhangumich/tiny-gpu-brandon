@@ -42,13 +42,13 @@ module dcache #(
 
     localparam  NUM_SETS_PER_BANK = NUM_BLOCKS/NUM_BANKS/NUM_WAYS,
                 TAG_LENGTH = ADDR_BITS-$clog2(NUM_BLOCKS/NUM_WAYS)-$clog2(CACHE_BLOCK_SIZE),
-                BANK_INDEX_LENGTH = NUM_BANKS > 1 ? clog2(NUM_BANKS) : 1,
-                SET_INDEX_LENGTH = NUM_SETS_PER_BANK > 1 ? clog2(NUM_SETS_PER_BANK) : 1,
-                BLOCK_INDEX_LENGTH = CACHE_BLOCK_SIZE > 1 ? clog2(CACHE_BLOCK_SIZE) : 1
+                BANK_INDEX_LENGTH = NUM_BANKS > 1 ? $clog2(NUM_BANKS) : 1,
+                SET_INDEX_LENGTH = NUM_SETS_PER_BANK > 1 ? $clog2(NUM_SETS_PER_BANK) : 1,
+                BLOCK_INDEX_LENGTH = CACHE_BLOCK_SIZE > 1 ? $clog2(CACHE_BLOCK_SIZE) : 1
                 ;
 
     initial begin
-        assert(NUM_WAYS <= NUM_BLOCKS/NUM_BANKS) // this design requires each set fits inside a bank
+        assert(NUM_WAYS <= NUM_BLOCKS/NUM_BANKS); // this design requires each set fits inside a bank
     end
 
     // cache state
@@ -95,8 +95,9 @@ module dcache #(
         assign block_offset[i] = CACHE_BLOCK_SIZE > 1 ? address_after_tag[i] : 0;
     end
 
+    // TODO: change this to an always_comb and change tags and tag_hits to logics
     for (genvar i = 0; i < NUM_CONSUMERS; i++) begin
-        assign tags[i] = ((consumer_read_valid[i] & consumer_read_address[i]) | (consumer_write_valid[i] & consumer_write_address[i]))[ADDR_BITS-1:ADDR_BITS-TAG_LENGTH];
+        assign tags[i] = (consumer_read_valid[i] & consumer_read_address[i])[ADDR_BITS-1 -: TAG_LENGTH] | (consumer_write_valid[i] & consumer_write_address[i])[ADDR_BITS-1 -: TAG_LENGTH];
         for (genvar j = 0; j < NUM_WAYS; j++) begin
             assign tag_hits[i][j] = valids[bank_indexes][set_indexes[i]][j] && tags[i] == tag_array[bank_indexes[i]][set_indexes[i]][j];
         end
