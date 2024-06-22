@@ -44,6 +44,7 @@ module dcache #(
                 TAG_LENGTH = ADDR_BITS-$clog2(NUM_BLOCKS/NUM_WAYS)-$clog2(CACHE_BLOCK_SIZE),
                 BANK_INDEX_LENGTH = NUM_BANKS > 1 ? $clog2(NUM_BANKS) : 1,
                 SET_INDEX_LENGTH = NUM_SETS_PER_BANK > 1 ? $clog2(NUM_SETS_PER_BANK) : 1,
+                WAY_INDEX_LENGTH = NUM_WAYS > 1 ? $clog2(NUM_WAYS) : 1,
                 BLOCK_INDEX_LENGTH = CACHE_BLOCK_SIZE > 1 ? $clog2(CACHE_BLOCK_SIZE) : 1
                 ;
 
@@ -77,7 +78,7 @@ module dcache #(
     wire tag_hits [NUM_CONSUMERS-1:0][NUM_WAYS-1:0]; // bits for which ways are hits
 
     // bank access
-    logic [$clog2(NUM_WAYS)] hit_way [NUM_CONSUMERS-1:0]; // decoded form of tag_hits
+    logic [WAY_INDEX_LENGTH-1:0] hit_way [NUM_CONSUMERS-1:0]; // decoded form of tag_hits
     logic [DATA_BITS-1:0] hit_data [NUM_CONSUMERS-1:0]; // data from cache hit, or data to be written to cache hit
 
     // cache miss
