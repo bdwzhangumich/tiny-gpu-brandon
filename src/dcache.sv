@@ -97,7 +97,7 @@ module dcache #(
 
     // TODO: change this to an always_comb and change tags and tag_hits to logics
     for (genvar i = 0; i < NUM_CONSUMERS; i++) begin
-        assign tags[i] = (consumer_read_valid[i] & consumer_read_address[i])[ADDR_BITS-1 -: TAG_LENGTH] | (consumer_write_valid[i] & consumer_write_address[i])[ADDR_BITS-1 -: TAG_LENGTH];
+        assign tags[i] = ((consumer_read_valid[i] & consumer_read_address[i]) | (consumer_write_valid[i] & consumer_write_address[i])) >> (ADDR_BITS - TAG_LENGTH);
         for (genvar j = 0; j < NUM_WAYS; j++) begin
             assign tag_hits[i][j] = valids[bank_indexes][set_indexes[i]][j] && tags[i] == tag_array[bank_indexes[i]][set_indexes[i]][j];
         end
@@ -188,7 +188,7 @@ module dcache #(
                     if (!next_valids[bank_indexes[i]][set_indexes[i]][j]) begin
                         next_valids[bank_indexes[i]][set_indexes[i]][j] = 1;
                         next_mrus[bank_indexes[i]][set_indexes[i]][j] = 1;
-                        next_tag_array[bank_indexes[i]][set_indexes[i]][j] = (consumer_read_valid[i] & consumer_read_address[i]) | (consumer_write_valid[i] & consumer_write_address[i])[ADDR_BITS-1 -: TAG_LENGTH];
+                        next_tag_array[bank_indexes[i]][set_indexes[i]][j] = ((consumer_read_valid[i] & consumer_read_address[i]) | (consumer_write_valid[i] & consumer_write_address[i])) >> (ADDR_BITS - TAG_LENGTH);
                         next_banks[bank_indexes[i]][set_indexes[i]][j] = controller_read_data[i];
                         if (consumer_write_valid[i]) begin
                             // write new data from lsu
