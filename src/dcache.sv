@@ -75,7 +75,7 @@ module dcache #(
 
     // tag search
     wire [TAG_LENGTH-1:0] tags [NUM_CONSUMERS-1:0];
-    wire tag_hits [NUM_CONSUMERS-1:0][NUM_WAYS-1:0]; // bits for which ways are hits
+    wire [NUM_WAYS-1:0] tag_hits [NUM_CONSUMERS-1:0]; // bits for which ways are hits
 
     // bank access
     logic [WAY_INDEX_LENGTH-1:0] hit_way [NUM_CONSUMERS-1:0]; // decoded form of tag_hits
