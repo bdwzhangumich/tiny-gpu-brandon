@@ -96,7 +96,6 @@ module dcache #(
         assign block_offset[i] = CACHE_BLOCK_SIZE > 1 ? address_after_tag[i] : 0;
     end
 
-    // TODO: change this to an always_comb and change tags and tag_hits to logics
     for (genvar i = 0; i < NUM_CONSUMERS; i++) begin
         assign tags[i] = ((consumer_read_valid[i] & consumer_read_address[i]) | (consumer_write_valid[i] & consumer_write_address[i])) >> (ADDR_BITS - TAG_LENGTH);
         for (genvar j = 0; j < NUM_WAYS; j++) begin
