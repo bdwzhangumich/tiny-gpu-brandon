@@ -99,7 +99,7 @@ module dcache #(
     for (genvar i = 0; i < NUM_CONSUMERS; i++) begin
         assign tags[i] = ((consumer_read_valid[i] & consumer_read_address[i]) | (consumer_write_valid[i] & consumer_write_address[i])) >> (ADDR_BITS - TAG_LENGTH);
         for (genvar j = 0; j < NUM_WAYS; j++) begin
-            assign tag_hits[i][j] = valids[bank_indexes][set_indexes[i]][j] && tags[i] == tag_array[bank_indexes[i]][set_indexes[i]][j];
+            assign tag_hits[i][j] = valids[bank_indexes[i]][set_indexes[i]][j] && tags[i] == tag_array[bank_indexes[i]][set_indexes[i]][j];
         end
     end
 
