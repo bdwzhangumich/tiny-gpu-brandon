@@ -91,7 +91,7 @@ module dcache #(
     for (genvar i = 0; i < NUM_CONSUMERS; i++) begin
         assign address_after_tag[i] = (consumer_read_valid[i] & consumer_read_address[i]) | (consumer_write_valid[i] & consumer_write_address[i]);
         assign bank_indexes[i] = NUM_BANKS > 1 ? address_after_tag[i][ADDR_BITS-TAG_LENGTH-1 -: $clog2(NUM_BANKS)] : 0;
-        assign set_indexes[i] = NUM_SETS_PER_BANK > 1 ? address_after_tag[i][$clog2(CACHE_BLOCK_SIZE) +: $clog(NUM_SETS_PER_BANK)] : 0;
+        assign set_indexes[i] = NUM_SETS_PER_BANK > 1 ? address_after_tag[i][$clog2(CACHE_BLOCK_SIZE) +: SET_INDEX_LENGTH] : 0;
         assign block_offset[i] = CACHE_BLOCK_SIZE > 1 ? address_after_tag[i] : 0;
     end
 
