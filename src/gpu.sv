@@ -70,14 +70,14 @@ module gpu #(
     reg [NUM_LSUS-1:0] lsu_write_ready;
 
     // Data Cache <> Data Memory Controller Channels
-    reg [DATA_MEM_NUM_CHANNELS-1:0] data_cache_read_valid;
-    reg [DATA_MEM_ADDR_BITS-1:0] data_cache_read_address [DATA_MEM_NUM_CHANNELS-1:0];
-    reg [DATA_MEM_NUM_CHANNELS-1:0] data_cache_read_ready;
-    reg [DATA_MEM_DATA_BITS-1:0] data_cache_read_data [DATA_MEM_NUM_CHANNELS-1:0];
-    reg [DATA_MEM_NUM_CHANNELS-1:0] data_cache_write_valid;
-    reg [DATA_MEM_ADDR_BITS-1:0] data_cache_write_address [DATA_MEM_NUM_CHANNELS-1:0];
-    reg [DATA_MEM_DATA_BITS-1:0] data_cache_write_data [DATA_MEM_NUM_CHANNELS-1:0];
-    reg [DATA_MEM_NUM_CHANNELS-1:0] data_cache_write_ready;
+    reg [NUM_LSUS-1:0] data_cache_read_valid;
+    reg [DATA_MEM_ADDR_BITS-1:0] data_cache_read_address [NUM_LSUS-1:0];
+    reg [NUM_LSUS-1:0] data_cache_read_ready;
+    reg [DATA_MEM_DATA_BITS-1:0] data_cache_read_data [NUM_LSUS-1:0];
+    reg [NUM_LSUS-1:0] data_cache_write_valid;
+    reg [DATA_MEM_ADDR_BITS-1:0] data_cache_write_address [NUM_LSUS-1:0];
+    reg [DATA_MEM_DATA_BITS-1:0] data_cache_write_data [NUM_LSUS-1:0];
+    reg [NUM_LSUS-1:0] data_cache_write_ready;
 
     // Fetcher <> Program Memory Controller Channels
     localparam NUM_FETCHERS = NUM_CORES;
