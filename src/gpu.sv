@@ -48,6 +48,10 @@ module gpu #(
     output wire [DATA_MEM_DATA_BITS-1:0] data_mem_write_data [DATA_MEM_NUM_CHANNELS-1:0],
     input wire [DATA_MEM_NUM_CHANNELS-1:0] data_mem_write_ready
 );
+
+    initial begin
+        $dumpvars(2,data_cache);
+    end
     // Control
     wire [7:0] thread_count;
 
