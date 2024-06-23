@@ -90,14 +90,14 @@ module dcache #(
     logic [DATA_BITS-1:0] next_controller_write_data [NUM_CONSUMERS-1:0];
 
     for (genvar i = 0; i < NUM_CONSUMERS; i++) begin
-        assign address_after_tag[i] = (consumer_read_valid[i] & consumer_read_address[i]) | (consumer_write_valid[i] & consumer_write_address[i]);
+        assign address_after_tag[i] = ({ADDR_BITS{consumer_read_valid[i]}} & consumer_read_address[i]) | ({ADDR_BITS{consumer_write_valid[i]}} & consumer_write_address[i]);
         assign bank_indexes[i] = NUM_BANKS > 1 ? address_after_tag[i][ADDR_BITS-TAG_LENGTH-1 -: $clog2(NUM_BANKS)] : 0;
         assign set_indexes[i] = NUM_SETS_PER_BANK > 1 ? address_after_tag[i][$clog2(CACHE_BLOCK_SIZE) +: SET_INDEX_LENGTH] : 0;
         assign block_offset[i] = CACHE_BLOCK_SIZE > 1 ? address_after_tag[i] : 0;
     end
 
     for (genvar i = 0; i < NUM_CONSUMERS; i++) begin
-        assign tags[i] = ((consumer_read_valid[i] & consumer_read_address[i]) | (consumer_write_valid[i] & consumer_write_address[i])) >> (ADDR_BITS - TAG_LENGTH);
+        assign tags[i] = (({ADDR_BITS{consumer_read_valid[i]}} & consumer_read_address[i]) | ({ADDR_BITS{consumer_write_valid[i]}} & consumer_write_address[i])) >> (ADDR_BITS - TAG_LENGTH);
         for (genvar j = 0; j < NUM_WAYS; j++) begin
             assign tag_hits[i][j] = valids[bank_indexes[i]][set_indexes[i]][j] && tags[i] == tag_array[bank_indexes[i]][set_indexes[i]][j];
         end
@@ -141,7 +141,7 @@ module dcache #(
             // dont do anything if still waiting for past eviction to finish
             if (!controller_write_valid[i] || controller_write_ready[i]) begin
                 next_controller_read_valid[i] = !consumer_read_ready[i] && !|tag_hits[i] && (consumer_read_valid[i] || consumer_read_address[i]);
-                next_controller_read_address[i] = (consumer_read_valid[i] & consumer_read_address[i]) | (consumer_write_valid[i] & consumer_write_address[i]);
+                next_controller_read_address[i] = ({ADDR_BITS{consumer_read_valid[i]}} & consumer_read_address[i]) | ({ADDR_BITS{consumer_write_valid[i]}} & consumer_write_address[i]);
                 // stop any past evictions
                 next_controller_write_valid[i] = 0;
                 next_controller_write_address[i] = 0;
@@ -188,7 +188,7 @@ module dcache #(
                     if (!next_valids[bank_indexes[i]][set_indexes[i]][j]) begin
                         next_valids[bank_indexes[i]][set_indexes[i]][j] = 1;
                         next_mrus[bank_indexes[i]][set_indexes[i]][j] = 1;
-                        next_tag_array[bank_indexes[i]][set_indexes[i]][j] = ((consumer_read_valid[i] & consumer_read_address[i]) | (consumer_write_valid[i] & consumer_write_address[i])) >> (ADDR_BITS - TAG_LENGTH);
+                        next_tag_array[bank_indexes[i]][set_indexes[i]][j] = (({ADDR_BITS{consumer_read_valid[i]}} & consumer_read_address[i]) | ({ADDR_BITS{consumer_write_valid[i]}} & consumer_write_address[i])) >> (ADDR_BITS - TAG_LENGTH);
                         next_banks[bank_indexes[i]][set_indexes[i]][j] = controller_read_data[i];
                         if (consumer_write_valid[i]) begin
                             // write new data from lsu
