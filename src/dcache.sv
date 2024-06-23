@@ -34,11 +34,7 @@ module dcache #(
     output reg [DATA_BITS-1:0] controller_write_data [NUM_CONSUMERS-1:0],
     input reg [NUM_CONSUMERS-1:0] controller_write_ready,
 );
-    localparam IDLE = 3'b000, 
-        READ_WAITING = 3'b010, 
-        WRITE_WAITING = 3'b011,
-        READ_RELAYING = 3'b100,
-        WRITE_RELAYING = 3'b101;
+// TODO: split this module up into multiple modules? eg separate cache access logic and miss handling logic
 
     localparam  NUM_SETS_PER_BANK = NUM_BLOCKS/NUM_BANKS/NUM_WAYS,
                 TAG_LENGTH = ADDR_BITS-$clog2(NUM_BLOCKS/NUM_WAYS)-$clog2(CACHE_BLOCK_SIZE),
@@ -122,8 +118,6 @@ module dcache #(
             end
         end
     end
-
-    // TODO: split this module up into multiple modules?
 
     always_comb begin : bank_write
         next_valids = valids;
