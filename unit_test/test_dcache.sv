@@ -14,14 +14,25 @@ module testbench #(
 	
 	always #5 clk =~ clk;
 
-	logic [NUM_CONSUMERS-1:0] consumer_read_valid;
-	logic [ADDR_BITS-1:0] consumer_read_address [NUM_CONSUMERS-1:0];
-	logic [NUM_CONSUMERS-1:0] consumer_read_ready;
-	logic [DATA_BITS-1:0] consumer_read_data [NUM_CONSUMERS-1:0];
-	logic [NUM_CONSUMERS-1:0] consumer_write_valid;
-	logic [ADDR_BITS-1:0] consumer_write_address [NUM_CONSUMERS-1:0];
-	logic [DATA_BITS-1:0] consumer_write_data [NUM_CONSUMERS-1:0];
-	logic [NUM_CONSUMERS-1:0] consumer_write_ready;
+    // Consumer Interface (Fetchers / LSUs)
+    logic [NUM_CONSUMERS-1:0] consumer_read_valid;
+    logic [ADDR_BITS-1:0] consumer_read_address [NUM_CONSUMERS-1:0];
+    logic [NUM_CONSUMERS-1:0] consumer_read_ready;
+    logic [DATA_BITS-1:0] consumer_read_data [NUM_CONSUMERS-1:0];
+    logic [NUM_CONSUMERS-1:0] consumer_write_valid;
+    logic [ADDR_BITS-1:0] consumer_write_address [NUM_CONSUMERS-1:0];
+    logic [DATA_BITS-1:0] consumer_write_data [NUM_CONSUMERS-1:0];
+    logic [NUM_CONSUMERS-1:0] consumer_write_ready;
+
+    // Controller Interface
+    logic [NUM_CONSUMERS-1:0] controller_read_valid;
+    logic [ADDR_BITS-1:0] controller_read_address [NUM_CONSUMERS-1:0];
+    logic [NUM_CONSUMERS-1:0] controller_read_ready;
+    logic [DATA_BITS-1:0] controller_read_data [NUM_CONSUMERS-1:0];
+    logic [NUM_CONSUMERS-1:0] controller_write_valid;
+    logic [ADDR_BITS-1:0] controller_write_address [NUM_CONSUMERS-1:0];
+    logic [DATA_BITS-1:0] controller_write_data [NUM_CONSUMERS-1:0];
+    logic [NUM_CONSUMERS-1:0] controller_write_ready;
 
 	dcache #(
         .ADDR_BITS(ADDR_BITS),
@@ -56,6 +67,7 @@ module testbench #(
     );
 
 	initial begin
+		clk = 0;
 		consumer_read_valid = 0;
 		consumer_read_address = 0;
 		consumer_read_ready = 0;
