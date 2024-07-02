@@ -1,17 +1,37 @@
-module testbench;
+`timescale 1ns/1ns
+
+module testbench #(
+	parameter ADDR_BITS = 8,
+	parameter DATA_BITS = 8,
+	parameter NUM_CONSUMERS = 8,
+	parameter NUM_CHANNELS = 8,
+	parameter NUM_BLOCKS = 8,
+	parameter NUM_BANKS = 2,
+	parameter NUM_WAYS = 4,
+	parameter CACHE_BLOCK_SIZE = 1,
+);
 	reg clk;
 	
 	always #5 clk =~ clk;
 
+	logic [NUM_CONSUMERS-1:0] consumer_read_valid;
+	logic [ADDR_BITS-1:0] consumer_read_address [NUM_CONSUMERS-1:0];
+	logic [NUM_CONSUMERS-1:0] consumer_read_ready;
+	logic [DATA_BITS-1:0] consumer_read_data [NUM_CONSUMERS-1:0];
+	logic [NUM_CONSUMERS-1:0] consumer_write_valid;
+	logic [ADDR_BITS-1:0] consumer_write_address [NUM_CONSUMERS-1:0];
+	logic [DATA_BITS-1:0] consumer_write_data [NUM_CONSUMERS-1:0];
+	logic [NUM_CONSUMERS-1:0] consumer_write_ready;
+
 	dcache #(
-        .ADDR_BITS(8),
-        .DATA_BITS(8),
-        .NUM_CONSUMERS(8),
-        .NUM_CHANNELS(8),
-        .NUM_BLOCKS(8),
-        .NUM_BANKS(2),
-        .NUM_WAYS(4),
-        .CACHE_BLOCK_SIZE(1)
+        .ADDR_BITS(ADDR_BITS),
+        .DATA_BITS(DATA_BITS),
+        .NUM_CONSUMERS(NUM_CONSUMERS),
+        .NUM_CHANNELS(NUM_CHANNELS),
+        .NUM_BLOCKS(NUM_BLOCKS),
+        .NUM_BANKS(NUM_BANKS),
+        .NUM_WAYS(NUM_WAYS),
+        .CACHE_BLOCK_SIZE(CACHE_BLOCK_SIZE)
     ) data_cache (
         .clk(clk),
         .reset(reset),
@@ -44,8 +64,9 @@ module testbench;
 		consumer_write_address = 0;
 		consumer_write_data = 0;
 		consumer_write_ready = 0;
-		@(negedge clock);
-		$$display("controller_read_valid=0x%0h",controller_read_valid);
+		@(negedge clk);
+		$display("controller_read_valid=0x%0h",controller_read_valid);
+		$finish;
 	end
 
 endmodule
