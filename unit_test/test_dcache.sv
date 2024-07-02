@@ -77,7 +77,7 @@ module testbench #(
 		consumer_write_data = 0;
 		consumer_write_ready = 0;
 		@(negedge clk);
-		$display("controller_read_valid=0x%0h",controller_read_valid);
+		$display("controller_read_valid=0x%h",controller_read_valid);
 		$finish;
 	end
 
