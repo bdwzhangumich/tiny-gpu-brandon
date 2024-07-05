@@ -1,18 +1,18 @@
 `timescale 1ns/1ns
 
 module testbench #(
-	parameter ADDR_BITS = 8,
-	parameter DATA_BITS = 8,
-	parameter NUM_CONSUMERS = 8,
-	parameter NUM_CHANNELS = 8,
-	parameter NUM_BLOCKS = 8,
-	parameter NUM_BANKS = 2,
-	parameter NUM_WAYS = 4,
-	parameter CACHE_BLOCK_SIZE = 1,
+    parameter ADDR_BITS = 8,
+    parameter DATA_BITS = 8,
+    parameter NUM_CONSUMERS = 8,
+    parameter NUM_CHANNELS = 8,
+    parameter NUM_BLOCKS = 8,
+    parameter NUM_BANKS = 2,
+    parameter NUM_WAYS = 4,
+    parameter CACHE_BLOCK_SIZE = 1,
 );
-	reg clk;
-	
-	always #5 clk =~ clk;
+    reg clk;
+    
+    always #5 clk =~ clk;
     dcache_input_if #(
         .ADDR_BITS(ADDR_BITS),
         .DATA_BITS(DATA_BITS),
@@ -33,7 +33,7 @@ module testbench #(
         .NUM_WAYS(NUM_WAYS),
         .CACHE_BLOCK_SIZE(CACHE_BLOCK_SIZE)
     ) out_if(clk);
-	dcache #(
+    dcache #(
         .ADDR_BITS(ADDR_BITS),
         .DATA_BITS(DATA_BITS),
         .NUM_CONSUMERS(NUM_CONSUMERS),
@@ -65,25 +65,24 @@ module testbench #(
         .controller_write_ready(in_if.controller_write_ready)
     );
 
-	initial begin
-		clk = 0;
-		// TODO: properly separate inputs and outputs
-		@(negedge clk);
-		$display("controller_read_valid=0x%h",out_if.controller_read_valid);
-		$finish;
-	end
+    initial begin
+        clk = 0;
+        @(negedge clk);
+        $display("controller_read_valid=0x%h",out_if.controller_read_valid);
+        $finish;
+    end
 
 endmodule
 
 interface dcache_input_if #(
-	parameter ADDR_BITS = 8,
-	parameter DATA_BITS = 8,
-	parameter NUM_CONSUMERS = 8,
-	parameter NUM_CHANNELS = 8,
-	parameter NUM_BLOCKS = 8,
-	parameter NUM_BANKS = 2,
-	parameter NUM_WAYS = 4,
-	parameter CACHE_BLOCK_SIZE = 1,
+    parameter ADDR_BITS = 8,
+    parameter DATA_BITS = 8,
+    parameter NUM_CONSUMERS = 8,
+    parameter NUM_CHANNELS = 8,
+    parameter NUM_BLOCKS = 8,
+    parameter NUM_BANKS = 2,
+    parameter NUM_WAYS = 4,
+    parameter CACHE_BLOCK_SIZE = 1,
 ) (input clk);
     // Consumer Inputs
     logic [NUM_CONSUMERS-1:0] consumer_read_valid;
@@ -99,14 +98,14 @@ interface dcache_input_if #(
 endinterface
 
 interface dcache_output_if #(
-	parameter ADDR_BITS = 8,
-	parameter DATA_BITS = 8,
-	parameter NUM_CONSUMERS = 8,
-	parameter NUM_CHANNELS = 8,
-	parameter NUM_BLOCKS = 8,
-	parameter NUM_BANKS = 2,
-	parameter NUM_WAYS = 4,
-	parameter CACHE_BLOCK_SIZE = 1,
+    parameter ADDR_BITS = 8,
+    parameter DATA_BITS = 8,
+    parameter NUM_CONSUMERS = 8,
+    parameter NUM_CHANNELS = 8,
+    parameter NUM_BLOCKS = 8,
+    parameter NUM_BANKS = 2,
+    parameter NUM_WAYS = 4,
+    parameter CACHE_BLOCK_SIZE = 1,
 ) (input clk);
     // Consumer Outputs
     logic [NUM_CONSUMERS-1:0] consumer_read_ready;
