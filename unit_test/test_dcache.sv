@@ -1,8 +1,5 @@
 `timescale 1ns/1ns
 
-`define half_cycle_length 5
-`define check_output compare_output_interfaces(clk, out_if.consumer_read_ready, out_if.consumer_read_data, out_if.consumer_write_ready, out_if.controller_read_valid, out_if.controller_read_address, out_if.controller_write_valid, out_if.controller_write_address, out_if.controller_write_data, expected_out_if.consumer_read_ready, expected_out_if.consumer_read_data, expected_out_if.consumer_write_ready, expected_out_if.controller_read_valid, expected_out_if.controller_read_address, expected_out_if.controller_write_valid, expected_out_if.controller_write_address, expected_out_if.controller_write_data, check_failed); failed |= check_failed
-
 `define ADDR_BITS 8
 `define DATA_BITS 8
 `define NUM_CONSUMERS 8
@@ -11,6 +8,30 @@
 `define NUM_BANKS 2
 `define NUM_WAYS 4
 `define CACHE_BLOCK_SIZE 1
+
+`define half_cycle_length 5
+
+// sv2v has bug which makes connecting ports by name for this not simulate correctly
+`define check_output compare_output_interfaces ( \
+clk, \
+out_if.consumer_read_ready, \
+out_if.consumer_read_data, \
+out_if.consumer_write_ready, \
+out_if.controller_read_valid, \
+out_if.controller_read_address, \
+out_if.controller_write_valid, \
+out_if.controller_write_address, \
+out_if.controller_write_data, \
+expected_out_if.consumer_read_ready, \
+expected_out_if.consumer_read_data, \
+expected_out_if.consumer_write_ready, \
+expected_out_if.controller_read_valid, \
+expected_out_if.controller_read_address, \
+expected_out_if.controller_write_valid, \
+expected_out_if.controller_write_address, \
+expected_out_if.controller_write_data, \
+failed \
+);
 
 module testbench #(
     parameter ADDR_BITS = `ADDR_BITS,
@@ -24,7 +45,6 @@ module testbench #(
 );
     reg clk;
     reg failed;
-    reg check_failed;
     
     always #`half_cycle_length clk =~ clk;
     dcache_input_if #(
@@ -148,7 +168,7 @@ module testbench #(
                 @(negedge clk); // Cycle 2
                 // dcache forwards load and store to memory controller
                 expected_out_if.controller_read_valid[0] = 1;
-                expected_out_if.controller_read_address[0] = 'hFF;
+                expected_out_if.controller_read_address[0] = 'hFF; // TODO: figure out why commenting this causes a fail
                 expected_out_if.controller_read_valid[1] = 1;
                 expected_out_if.controller_read_address[1] = 'hF0;
                 `check_output;
@@ -234,7 +254,7 @@ task compare_output_interfaces;
         end
         if (controller_read_address !== expected_controller_read_address) begin
             $display ( 
-                "Failure at Cycle %0t: controller_read_address=0x%0h controller_read_address=0x%0h",
+                "Failure at Cycle %0t: controller_read_address=0x%0h expected_controller_read_address=0x%0h",
                 $time/2/`half_cycle_length, controller_read_address, expected_controller_read_address
             );
             failed = 1;
