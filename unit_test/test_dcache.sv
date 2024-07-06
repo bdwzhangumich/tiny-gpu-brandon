@@ -1,7 +1,7 @@
 `timescale 1ns/1ns
 
 `define half_cycle_length 5
-`define check_output compare_output_interfaces(clk, out_if.consumer_read_ready, out_if.consumer_read_data, out_if.consumer_write_ready, out_if.controller_read_valid, out_if.controller_read_address, out_if.controller_write_valid, out_if.controller_write_address, out_if.controller_write_data, expected_out_if.consumer_read_ready, expected_out_if.consumer_read_data, expected_out_if.consumer_write_ready, expected_out_if.controller_read_valid, expected_out_if.controller_read_address, expected_out_if.controller_write_valid, expected_out_if.controller_write_address, expected_out_if.controller_write_data)
+`define check_output compare_output_interfaces(clk, out_if.consumer_read_ready, out_if.consumer_read_data, out_if.consumer_write_ready, out_if.controller_read_valid, out_if.controller_read_address, out_if.controller_write_valid, out_if.controller_write_address, out_if.controller_write_data, expected_out_if.consumer_read_ready, expected_out_if.consumer_read_data, expected_out_if.consumer_write_ready, expected_out_if.controller_read_valid, expected_out_if.controller_read_address, expected_out_if.controller_write_valid, expected_out_if.controller_write_address, expected_out_if.controller_write_data, check_failed); failed |= check_failed
 
 `define ADDR_BITS 8
 `define DATA_BITS 8
@@ -23,6 +23,8 @@ module testbench #(
     parameter CACHE_BLOCK_SIZE = `CACHE_BLOCK_SIZE,
 );
     reg clk;
+    reg failed;
+    reg check_failed;
     
     always #`half_cycle_length clk =~ clk;
     dcache_input_if #(
@@ -91,6 +93,7 @@ module testbench #(
     initial begin
         $dumpvars(2,data_cache);
         clk = 0;
+        failed = 0;
 
         // Test 0
         // Tests one load and one store
@@ -164,7 +167,10 @@ module testbench #(
         
         $display("Test 0 end");
 
-        $display("Done!");
+        if (failed === 0)
+            $display("Passed!");
+        else
+            $display("Failed!");
         $finish;
     end
 
@@ -194,47 +200,66 @@ task compare_output_interfaces;
     input [`ADDR_BITS-1:0] expected_controller_write_address [`NUM_CONSUMERS-1:0];
     input [`DATA_BITS-1:0] expected_controller_write_data [`NUM_CONSUMERS-1:0];
 
+    output failed;
+
     begin
-        if (consumer_read_ready !== expected_consumer_read_ready)
+        failed = 0;
+        if (consumer_read_ready !== expected_consumer_read_ready) begin
             $display ( 
                 "Failure at Cycle %0t: consumer_read_ready=0x%0h expected_consumer_read_ready=0x%0h",
                 $time/2/`half_cycle_length, consumer_read_ready, expected_consumer_read_ready
             );
-        if (consumer_read_data !== expected_consumer_read_data)
+            failed = 1;
+        end
+        if (consumer_read_data !== expected_consumer_read_data) begin
             $display ( 
                 "Failure at Cycle %0t: consumer_read_data=0x%0h expected_consumer_read_data=0x%0h",
                 $time/2/`half_cycle_length, consumer_read_data, expected_consumer_read_data
             );
-        if (consumer_write_ready !== expected_consumer_write_ready)
+            failed = 1;
+        end
+        if (consumer_write_ready !== expected_consumer_write_ready) begin
             $display ( 
                 "Failure at Cycle %0t: consumer_write_ready=0x%0h expected_consumer_write_ready=0x%0h",
                 $time/2/`half_cycle_length, consumer_write_ready, expected_consumer_write_ready
             );
-        if (controller_read_valid !== expected_controller_read_valid)
+            failed = 1;
+        end
+        if (controller_read_valid !== expected_controller_read_valid) begin
             $display ( 
                 "Failure at Cycle %0t: controller_read_valid=0x%0h expected_controller_read_valid=0x%0h",
                 $time/2/`half_cycle_length, controller_read_valid, expected_controller_read_valid
             );
-        if (controller_read_address !== expected_controller_read_address)
+            failed = 1;
+        end
+        if (controller_read_address !== expected_controller_read_address) begin
             $display ( 
                 "Failure at Cycle %0t: controller_read_address=0x%0h controller_read_address=0x%0h",
                 $time/2/`half_cycle_length, controller_read_address, expected_controller_read_address
             );
-        if (controller_write_valid !== expected_controller_write_valid)
+            failed = 1;
+        end
+        if (controller_write_valid !== expected_controller_write_valid) begin
             $display ( 
                 "Failure at Cycle %0t: controller_write_valid=0x%0h expected_controller_write_valid=0x%0h",
                 $time/2/`half_cycle_length, controller_write_valid, expected_controller_write_valid
             );
-        if (controller_write_address !== expected_controller_write_address)
+            failed = 1;
+        end
+        if (controller_write_address !== expected_controller_write_address) begin
             $display ( 
                 "Failure at Cycle %0t: controller_write_address=0x%0h expected_controller_write_address=0x%0h",
                 $time/2/`half_cycle_length, controller_write_address, expected_controller_write_address
             );
-        if (controller_write_data !== expected_controller_write_data)
+            failed = 1;
+        end
+        if (controller_write_data !== expected_controller_write_data) begin
             $display ( 
                 "Failure at Cycle %0t: controller_write_data=0x%0h expected_controller_write_data=0x%0h",
                 $time/2/`half_cycle_length, controller_write_data, expected_controller_write_data
             );
+            failed = 1;
+        end
     end
 endtask
 
