@@ -122,6 +122,7 @@ module testbench #(
                 `check_output;
             end
         join
+        $display("Done!");
         $finish;
     end
 
@@ -154,42 +155,42 @@ task compare_output_interfaces;
     begin
         if (consumer_read_ready !== expected_consumer_read_ready)
             $display ( 
-                "Cycle %0t ERROR: consumer_read_ready=0x%0h expected_consumer_read_ready=0x%0h",
+                "Failure at Cycle %0t: consumer_read_ready=0x%0h expected_consumer_read_ready=0x%0h",
                 $time/2/`half_cycle_length, consumer_read_ready, expected_consumer_read_ready
             );
         if (consumer_read_data !== expected_consumer_read_data)
             $display ( 
-                "Cycle %0t ERROR: consumer_read_data=0x%0h expected_consumer_read_data=0x%0h",
+                "Failure at Cycle %0t: consumer_read_data=0x%0h expected_consumer_read_data=0x%0h",
                 $time/2/`half_cycle_length, consumer_read_data, expected_consumer_read_data
             );
         if (consumer_write_ready !== expected_consumer_write_ready)
             $display ( 
-                "Cycle %0t ERROR: consumer_write_ready=0x%0h expected_consumer_write_ready=0x%0h",
+                "Failure at Cycle %0t: consumer_write_ready=0x%0h expected_consumer_write_ready=0x%0h",
                 $time/2/`half_cycle_length, consumer_write_ready, expected_consumer_write_ready
             );
         if (controller_read_valid !== expected_controller_read_valid)
             $display ( 
-                "Cycle %0t ERROR: controller_read_valid=0x%0h expected_controller_read_valid=0x%0h",
+                "Failure at Cycle %0t: controller_read_valid=0x%0h expected_controller_read_valid=0x%0h",
                 $time/2/`half_cycle_length, controller_read_valid, expected_controller_read_valid
             );
         if (controller_read_address !== expected_controller_read_address)
             $display ( 
-                "Cycle %0t ERROR: controller_read_address=0x%0h controller_read_address=0x%0h",
+                "Failure at Cycle %0t: controller_read_address=0x%0h controller_read_address=0x%0h",
                 $time/2/`half_cycle_length, controller_read_address, expected_controller_read_address
             );
         if (controller_write_valid !== expected_controller_write_valid)
             $display ( 
-                "Cycle %0t ERROR: controller_write_valid=0x%0h expected_controller_write_valid=0x%0h",
+                "Failure at Cycle %0t: controller_write_valid=0x%0h expected_controller_write_valid=0x%0h",
                 $time/2/`half_cycle_length, controller_write_valid, expected_controller_write_valid
             );
         if (controller_write_address !== expected_controller_write_address)
             $display ( 
-                "Cycle %0t ERROR: controller_write_address=0x%0h expected_controller_write_address=0x%0h",
+                "Failure at Cycle %0t: controller_write_address=0x%0h expected_controller_write_address=0x%0h",
                 $time/2/`half_cycle_length, controller_write_address, expected_controller_write_address
             );
         if (controller_write_data !== expected_controller_write_data)
             $display ( 
-                "Cycle %0t ERROR: controller_write_data=0x%0h expected_controller_write_data=0x%0h",
+                "Failure at Cycle %0t: controller_write_data=0x%0h expected_controller_write_data=0x%0h",
                 $time/2/`half_cycle_length, controller_write_data, expected_controller_write_data
             );
     end
