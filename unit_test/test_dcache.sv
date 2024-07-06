@@ -176,7 +176,7 @@ module testbench #(
                 @(negedge clk); // Cycle 2
                 // dcache forwards load and store to memory controller
                 expected_out_if.controller_read_valid[0] = 1;
-                expected_out_if.controller_read_address[0] = 'hFF; // TODO: figure out why commenting this causes a fail
+                expected_out_if.controller_read_address[0] = 'hFF;
                 expected_out_if.controller_read_valid[1] = 1;
                 expected_out_if.controller_read_address[1] = 'hF0;
                 `check_output;
