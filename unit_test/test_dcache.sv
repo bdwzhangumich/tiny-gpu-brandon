@@ -91,8 +91,11 @@ module testbench #(
     initial begin
         $dumpvars(2,data_cache);
         clk = 0;
+
+        // Test 0
+        $display("Test 0 begin");
         fork
-            // test1 driver
+            // driver
             // doesnt seem possible to drive using a task with sv2v
             begin
                 in_if.reset = 1;
@@ -108,7 +111,7 @@ module testbench #(
                 in_if.reset = 0;
             end
 
-            //test1 scoreboard
+            // scoreboard
             begin
                 expected_out_if.consumer_read_ready = 0;
                 expected_out_if.consumer_read_data = 0;
@@ -122,6 +125,8 @@ module testbench #(
                 `check_output;
             end
         join
+        $display("Test 0 end");
+
         $display("Done!");
         $finish;
     end
