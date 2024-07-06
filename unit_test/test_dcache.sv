@@ -11,14 +11,6 @@
 
 `define half_cycle_length 5
 
-`define compare_expected(port, port_string) if (out_if.``port`` !== expected_out_if.``port``) begin \
-        $display ( \
-            "Failure at Cycle %0t: %s=0x%0h expected_%s=0x%0h", \
-                $time/2/`half_cycle_length, port_string, out_if.``port``, port_string, expected_out_if.``port`` \
-            ); \
-            failed = 1; \
-        end
-
 module testbench #(
     parameter ADDR_BITS = `ADDR_BITS,
     parameter DATA_BITS = `DATA_BITS,
@@ -101,12 +93,12 @@ module testbench #(
         clk = 0;
         failed = 0;
 
+        // TODO: move tests into separate tasks
         // Test 0
         // Tests one load and one store
         $display("Test 0 begin");
         fork
             // driver
-            // doesnt seem possible to drive using a task with sv2v
             begin
                 in_if.reset = 1;
                 in_if.consumer_read_valid = 0;
@@ -172,7 +164,7 @@ module testbench #(
         join
         $display("Test 0 end");
 
-        // TODO: add tests for cache hits, eviction (shouldnt be too hardto force eviction this cache is set associative), 
+        // TODO: add tests for cache hits, eviction (shouldnt be too hard to force eviction this cache is set associative)
 
         if (failed === 0)
             $display("Passed!");
@@ -181,18 +173,29 @@ module testbench #(
         $finish;
     end
 
+    `define compare_expected(port, port_string) if (out_if.``port`` !== expected_out_if.``port``) begin \
+                $display ( \
+                    "Failure at Cycle %0t: %s=0x%0h expected_%s=0x%0h", \
+                    $time/2/`half_cycle_length, \
+                    port_string, \
+                    out_if.``port``, \
+                    port_string, \
+                    expected_out_if.``port`` \
+                ); \
+                failed = 1; \
+            end
     task compare_output_interfaces;
-    begin
-        failed = 0;
-        `compare_expected(consumer_read_ready, "consumer_read_ready")
-        `compare_expected(consumer_read_data,"consumer_read_data")
-        `compare_expected(consumer_write_ready,"consumer_write_ready")
-        `compare_expected(controller_read_valid,"controller_read_valid")
-        `compare_expected(controller_read_address,"controller_read_address")
-        `compare_expected(controller_write_valid,"controller_write_valid")
-        `compare_expected(controller_write_address,"controller_write_address")
-        `compare_expected(controller_write_data,"controller_write_data")
-    end
+        begin
+            failed = 0;
+            `compare_expected(consumer_read_ready, "consumer_read_ready")
+            `compare_expected(consumer_read_data, "consumer_read_data")
+            `compare_expected(consumer_write_ready, "consumer_write_ready")
+            `compare_expected(controller_read_valid, "controller_read_valid")
+            `compare_expected(controller_read_address, "controller_read_address")
+            `compare_expected(controller_write_valid, "controller_write_valid")
+            `compare_expected(controller_write_address, "controller_write_address")
+            `compare_expected(controller_write_data, "controller_write_data")
+        end
     endtask
 endmodule
 
