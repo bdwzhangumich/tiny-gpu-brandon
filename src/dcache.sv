@@ -134,7 +134,7 @@ module dcache #(
         for (int i = 0; i < NUM_CONSUMERS; i++) begin
             // dont do anything if still waiting for past eviction to finish
             if (!controller_write_valid[i] || controller_write_ready[i]) begin
-                next_controller_read_valid[i] = !consumer_read_ready[i] && !|tag_hits[i] && (consumer_read_valid[i] || consumer_read_address[i]);
+                next_controller_read_valid[i] = !|tag_hits[i] && ((consumer_read_valid[i] && !consumer_read_ready[i]) || (consumer_write_valid[i] && !consumer_write_ready[i]));
                 next_controller_read_address[i] = ({ADDR_BITS{consumer_read_valid[i]}} & consumer_read_address[i]) | ({ADDR_BITS{consumer_write_valid[i]}} & consumer_write_address[i]);
                 // stop any past evictions
                 next_controller_write_valid[i] = 0;
