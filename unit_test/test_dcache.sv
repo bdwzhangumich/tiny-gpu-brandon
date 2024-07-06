@@ -33,6 +33,14 @@ expected_out_if.controller_write_data, \
 failed \
 );
 
+`define compare_expected(port, port_string) if (``port`` !== expected_``port``) begin \
+        $display ( \
+            "Failure at Cycle %0t: %s=0x%0h expected_%s=0x%0h", \
+                $time/2/`half_cycle_length, port_string, ``port``, port_string, expected_``port`` \
+            ); \
+            failed = 1; \
+        end \
+
 module testbench #(
     parameter ADDR_BITS = `ADDR_BITS,
     parameter DATA_BITS = `DATA_BITS,
@@ -224,62 +232,14 @@ task compare_output_interfaces;
 
     begin
         failed = 0;
-        if (consumer_read_ready !== expected_consumer_read_ready) begin
-            $display ( 
-                "Failure at Cycle %0t: consumer_read_ready=0x%0h expected_consumer_read_ready=0x%0h",
-                $time/2/`half_cycle_length, consumer_read_ready, expected_consumer_read_ready
-            );
-            failed = 1;
-        end
-        if (consumer_read_data !== expected_consumer_read_data) begin
-            $display ( 
-                "Failure at Cycle %0t: consumer_read_data=0x%0h expected_consumer_read_data=0x%0h",
-                $time/2/`half_cycle_length, consumer_read_data, expected_consumer_read_data
-            );
-            failed = 1;
-        end
-        if (consumer_write_ready !== expected_consumer_write_ready) begin
-            $display ( 
-                "Failure at Cycle %0t: consumer_write_ready=0x%0h expected_consumer_write_ready=0x%0h",
-                $time/2/`half_cycle_length, consumer_write_ready, expected_consumer_write_ready
-            );
-            failed = 1;
-        end
-        if (controller_read_valid !== expected_controller_read_valid) begin
-            $display ( 
-                "Failure at Cycle %0t: controller_read_valid=0x%0h expected_controller_read_valid=0x%0h",
-                $time/2/`half_cycle_length, controller_read_valid, expected_controller_read_valid
-            );
-            failed = 1;
-        end
-        if (controller_read_address !== expected_controller_read_address) begin
-            $display ( 
-                "Failure at Cycle %0t: controller_read_address=0x%0h expected_controller_read_address=0x%0h",
-                $time/2/`half_cycle_length, controller_read_address, expected_controller_read_address
-            );
-            failed = 1;
-        end
-        if (controller_write_valid !== expected_controller_write_valid) begin
-            $display ( 
-                "Failure at Cycle %0t: controller_write_valid=0x%0h expected_controller_write_valid=0x%0h",
-                $time/2/`half_cycle_length, controller_write_valid, expected_controller_write_valid
-            );
-            failed = 1;
-        end
-        if (controller_write_address !== expected_controller_write_address) begin
-            $display ( 
-                "Failure at Cycle %0t: controller_write_address=0x%0h expected_controller_write_address=0x%0h",
-                $time/2/`half_cycle_length, controller_write_address, expected_controller_write_address
-            );
-            failed = 1;
-        end
-        if (controller_write_data !== expected_controller_write_data) begin
-            $display ( 
-                "Failure at Cycle %0t: controller_write_data=0x%0h expected_controller_write_data=0x%0h",
-                $time/2/`half_cycle_length, controller_write_data, expected_controller_write_data
-            );
-            failed = 1;
-        end
+        `compare_expected(consumer_read_ready, "consumer_read_ready");
+        `compare_expected(consumer_read_data,"consumer_read_data");
+        `compare_expected(consumer_write_ready,"consumer_write_ready");
+        `compare_expected(controller_read_valid,"controller_read_valid");
+        `compare_expected(controller_read_address,"controller_read_address");
+        `compare_expected(controller_write_valid,"controller_write_valid");
+        `compare_expected(controller_write_address,"controller_write_address");
+        `compare_expected(controller_write_data,"controller_write_data");
     end
 endtask
 
