@@ -39,7 +39,7 @@ failed \
                 $time/2/`half_cycle_length, port_string, ``port``, port_string, expected_``port`` \
             ); \
             failed = 1; \
-        end \
+        end
 
 module testbench #(
     parameter ADDR_BITS = `ADDR_BITS,
@@ -192,7 +192,6 @@ module testbench #(
                 `check_output;
             end
         join
-        
         $display("Test 0 end");
 
         if (failed === 0)
@@ -232,14 +231,14 @@ task compare_output_interfaces;
 
     begin
         failed = 0;
-        `compare_expected(consumer_read_ready, "consumer_read_ready");
-        `compare_expected(consumer_read_data,"consumer_read_data");
-        `compare_expected(consumer_write_ready,"consumer_write_ready");
-        `compare_expected(controller_read_valid,"controller_read_valid");
-        `compare_expected(controller_read_address,"controller_read_address");
-        `compare_expected(controller_write_valid,"controller_write_valid");
-        `compare_expected(controller_write_address,"controller_write_address");
-        `compare_expected(controller_write_data,"controller_write_data");
+        `compare_expected(consumer_read_ready, "consumer_read_ready")
+        `compare_expected(consumer_read_data,"consumer_read_data")
+        `compare_expected(consumer_write_ready,"consumer_write_ready")
+        `compare_expected(controller_read_valid,"controller_read_valid")
+        `compare_expected(controller_read_address,"controller_read_address")
+        `compare_expected(controller_write_valid,"controller_write_valid")
+        `compare_expected(controller_write_address,"controller_write_address")
+        `compare_expected(controller_write_data,"controller_write_data")
     end
 endtask
 
