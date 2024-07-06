@@ -11,32 +11,10 @@
 
 `define half_cycle_length 5
 
-// sv2v has bug which makes connecting ports by name for this not simulate correctly
-`define check_output compare_output_interfaces ( \
-clk, \
-out_if.consumer_read_ready, \
-out_if.consumer_read_data, \
-out_if.consumer_write_ready, \
-out_if.controller_read_valid, \
-out_if.controller_read_address, \
-out_if.controller_write_valid, \
-out_if.controller_write_address, \
-out_if.controller_write_data, \
-expected_out_if.consumer_read_ready, \
-expected_out_if.consumer_read_data, \
-expected_out_if.consumer_write_ready, \
-expected_out_if.controller_read_valid, \
-expected_out_if.controller_read_address, \
-expected_out_if.controller_write_valid, \
-expected_out_if.controller_write_address, \
-expected_out_if.controller_write_data, \
-failed \
-);
-
-`define compare_expected(port, port_string) if (``port`` !== expected_``port``) begin \
+`define compare_expected(port, port_string) if (out_if.``port`` !== expected_out_if.``port``) begin \
         $display ( \
             "Failure at Cycle %0t: %s=0x%0h expected_%s=0x%0h", \
-                $time/2/`half_cycle_length, port_string, ``port``, port_string, expected_``port`` \
+                $time/2/`half_cycle_length, port_string, out_if.``port``, port_string, expected_out_if.``port`` \
             ); \
             failed = 1; \
         end
@@ -172,27 +150,29 @@ module testbench #(
                 expected_out_if.controller_write_address = 0;
                 expected_out_if.controller_write_data = 0;
                 @(negedge clk); // Cycle 1
-                `check_output;
+                compare_output_interfaces();
                 @(negedge clk); // Cycle 2
                 // dcache forwards load and store to memory controller
                 expected_out_if.controller_read_valid[0] = 1;
                 expected_out_if.controller_read_address[0] = 'hFF;
                 expected_out_if.controller_read_valid[1] = 1;
                 expected_out_if.controller_read_address[1] = 'hF0;
-                `check_output;
+                compare_output_interfaces();
                 @(negedge clk); // Cycle 3
                 // dcache copies data to banks and gives ack to memory controller
                 expected_out_if.controller_read_valid[1:0] = 0;
-                `check_output;
+                compare_output_interfaces();
                 @(negedge clk); // Cycle 4
                 // dcache responds to load and store from consumers
                 expected_out_if.consumer_read_ready[0] = 1;
                 expected_out_if.consumer_read_data[0] = 'hFF;
                 expected_out_if.consumer_write_ready[1] = 1;
-                `check_output;
+                compare_output_interfaces();
             end
         join
         $display("Test 0 end");
+
+        // TODO: add tests for cache hits, eviction (shouldnt be too hardto force eviction this cache is set associative), 
 
         if (failed === 0)
             $display("Passed!");
@@ -201,34 +181,7 @@ module testbench #(
         $finish;
     end
 
-endmodule
-
-task compare_output_interfaces;
-    input clk;
-    // Consumer Outputs
-    input [`NUM_CONSUMERS-1:0] consumer_read_ready;
-    input [`DATA_BITS-1:0] consumer_read_data [`NUM_CONSUMERS-1:0];
-    input [`NUM_CONSUMERS-1:0] consumer_write_ready;
-    // Controller Outputs
-    input [`NUM_CONSUMERS-1:0] controller_read_valid;
-    input [`ADDR_BITS-1:0] controller_read_address [`NUM_CONSUMERS-1:0];
-    input [`NUM_CONSUMERS-1:0] controller_write_valid;
-    input [`ADDR_BITS-1:0] controller_write_address [`NUM_CONSUMERS-1:0];
-    input [`DATA_BITS-1:0] controller_write_data [`NUM_CONSUMERS-1:0];
-    
-    // Expected Consumer Outputs
-    input [`NUM_CONSUMERS-1:0] expected_consumer_read_ready;
-    input [`DATA_BITS-1:0] expected_consumer_read_data [`NUM_CONSUMERS-1:0];
-    input [`NUM_CONSUMERS-1:0] expected_consumer_write_ready;
-    // Expected Controller Outputs
-    input [`NUM_CONSUMERS-1:0] expected_controller_read_valid;
-    input [`ADDR_BITS-1:0] expected_controller_read_address [`NUM_CONSUMERS-1:0];
-    input [`NUM_CONSUMERS-1:0] expected_controller_write_valid;
-    input [`ADDR_BITS-1:0] expected_controller_write_address [`NUM_CONSUMERS-1:0];
-    input [`DATA_BITS-1:0] expected_controller_write_data [`NUM_CONSUMERS-1:0];
-
-    output failed;
-
+    task compare_output_interfaces;
     begin
         failed = 0;
         `compare_expected(consumer_read_ready, "consumer_read_ready")
@@ -240,7 +193,8 @@ task compare_output_interfaces;
         `compare_expected(controller_write_address,"controller_write_address")
         `compare_expected(controller_write_data,"controller_write_data")
     end
-endtask
+    endtask
+endmodule
 
 interface dcache_input_if #(
     parameter ADDR_BITS = `ADDR_BITS,
