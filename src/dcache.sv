@@ -207,6 +207,8 @@ module dcache #(
             consumer_read_data <= 0;
             consumer_write_ready <= 0;
 
+            controller_read_valid <= 0;
+            controller_read_address <= 0;
             controller_write_valid <= 0;
             controller_write_address <= 0;
             controller_write_data <= 0;
