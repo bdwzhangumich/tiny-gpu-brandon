@@ -126,7 +126,7 @@ module testbench #(
             in_if.reset = 0;
             // request load from dcache
             in_if.consumer_read_valid[0] = 1;
-            in_if.consumer_read_address[0] = 'hFF;
+            in_if.consumer_read_address[0] = 'hFF; // TODO: look into why commenting this line changes read_data
             // request store from dcache
             in_if.consumer_write_valid[1] = 1;
             in_if.consumer_write_address[1] = 'hF0;
@@ -177,13 +177,13 @@ module testbench #(
         end
     endtask
 
-    `define compare_expected(port, port_string) if (out_if.``port`` !== expected_out_if.``port``) begin \
+    `define compare_expected(port) if (out_if.``port`` !== expected_out_if.``port``) begin \
                 $display ( \
                     "Failure at Cycle %0t: %s=0x%0h expected_%s=0x%0h", \
                     $time/2/`half_cycle_length, \
-                    port_string, \
+                    `"port`", \
                     out_if.``port``, \
-                    port_string, \
+                    `"port`", \
                     expected_out_if.``port`` \
                 ); \
                 failed = 1; \
@@ -191,14 +191,14 @@ module testbench #(
     task compare_output_interfaces;
         begin
             failed = 0;
-            `compare_expected(consumer_read_ready, "consumer_read_ready")
-            `compare_expected(consumer_read_data, "consumer_read_data")
-            `compare_expected(consumer_write_ready, "consumer_write_ready")
-            `compare_expected(controller_read_valid, "controller_read_valid")
-            `compare_expected(controller_read_address, "controller_read_address")
-            `compare_expected(controller_write_valid, "controller_write_valid")
-            `compare_expected(controller_write_address, "controller_write_address")
-            `compare_expected(controller_write_data, "controller_write_data")
+            `compare_expected(consumer_read_ready)
+            `compare_expected(consumer_read_data)
+            `compare_expected(consumer_write_ready)
+            `compare_expected(controller_read_valid)
+            `compare_expected(controller_read_address)
+            `compare_expected(controller_write_valid)
+            `compare_expected(controller_write_address)
+            `compare_expected(controller_write_data)
         end
     endtask
 endmodule
