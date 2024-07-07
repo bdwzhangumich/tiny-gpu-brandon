@@ -158,7 +158,8 @@ module dcache #(
                 if (&next_mrus[i][j]) next_mrus[i][j] = 0;
         // write data from memory controller
         for (int i = 0; i < NUM_CONSUMERS; i++) begin 
-            if ((consumer_read_valid[i] | consumer_write_valid[i]) && controller_read_ready[i]) begin // check if lsu is requesting and controller is ready
+            // check if dcache has requested and controller is ready
+            if (controller_read_valid[i] && controller_read_ready[i]) begin
                 if (&next_valids[bank_indexes[i]][set_indexes[i]]) begin
                     // eviction
                     for (int j = 0; j < NUM_WAYS; j++) begin
