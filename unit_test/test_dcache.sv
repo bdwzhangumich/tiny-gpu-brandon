@@ -95,14 +95,23 @@ module testbench #(
 
         // Test 0
         // Tests one load and one store
-        $display("Test 0 begin");
+        $display("Test 0 begin at Cycle %0t", $time/2/`half_cycle_length);
         fork
             test0_driver();
             test0_scoreboard();
         join
-        $display("Test 0 end");
+        $display("Test 0 completed");
 
-        // TODO: add tests for cache hits, eviction (shouldnt be too hard to force eviction this cache is set associative)
+        // TODO: add tests for cache hits, eviction (shouldnt be too hard to force eviction since this cache is set associative)
+
+        // Test 1
+        // Tests a load, store, and load in sequence and all to the same address
+        $display("Test 1 begin at Cycle %0t", $time/2/`half_cycle_length);
+        fork
+            test1_driver();
+            test1_scoreboard();
+        join
+        $display("Test 1 end");
 
         if (failed === 0)
             $display("Passed!");
@@ -173,6 +182,97 @@ module testbench #(
             expected_out_if.consumer_read_ready[0] = 1;
             expected_out_if.consumer_read_data[0] = 'hFF;
             expected_out_if.consumer_write_ready[1] = 1;
+            compare_output_interfaces();
+        end
+    endtask
+
+    task test1_driver;
+        begin
+            in_if.reset = 1;
+            in_if.consumer_read_valid = 0;
+            in_if.consumer_read_address = 0;
+            in_if.consumer_write_valid = 0;
+            in_if.consumer_write_address = 0;
+            in_if.consumer_write_data = 0;
+            in_if.controller_read_ready = 0;
+            in_if.controller_read_data = 0;
+            in_if.controller_write_ready = 0;
+            @(negedge clk); // Cycle 1
+            in_if.reset = 0;
+            // request load from dcache
+            in_if.consumer_read_valid[0] = 1;
+            in_if.consumer_read_address[0] = 'hFF;
+            @(negedge clk); // Cycle 2
+            // give dcache data from memory controller
+            in_if.controller_read_ready[0] = 1;
+            in_if.controller_read_data[0] = 'hFF;
+            @(negedge clk); // Cycle 3
+            @(negedge clk); // Cycle 4
+            // memory controller stops driving in response to acks
+            in_if.controller_read_ready[0] = 0;
+            in_if.controller_read_data[0] = 0;
+            @(negedge clk); // Cycle 5
+            // consumer stops driving in response to cache response
+            in_if.consumer_read_valid[0] = 0;
+            // request store from dcache
+            in_if.consumer_write_valid[1] = 1;
+            in_if.consumer_write_address[1] = 'hFF;
+            in_if.consumer_write_data[1] = 'hF0;
+            @(negedge clk); // Cycle 6
+            // consumer stops driving in response to cache response
+            in_if.consumer_write_valid[1] = 0;
+            // request load from dcache
+            in_if.consumer_read_valid[0] = 1;
+            @(negedge clk); // Cycle 7
+            // consumer stops driving in response to cache response
+            in_if.consumer_read_valid[0] = 0;
+        end
+    endtask
+
+    task test1_scoreboard;
+        begin
+            expected_out_if.consumer_read_ready = 0;
+            expected_out_if.consumer_read_data = 0;
+            expected_out_if.consumer_write_ready = 0;
+            expected_out_if.controller_read_valid = 0;
+            expected_out_if.controller_read_address = 0;
+            expected_out_if.controller_write_valid = 0;
+            expected_out_if.controller_write_address = 0;
+            expected_out_if.controller_write_data = 0;
+            @(negedge clk); // Cycle 1
+            compare_output_interfaces();
+            @(negedge clk); // Cycle 2
+            // dcache forwards load to memory controller
+            expected_out_if.controller_read_valid[0] = 1;
+            expected_out_if.controller_read_address[0] = 'hFF;
+            compare_output_interfaces();
+            @(negedge clk); // Cycle 3
+            // dcache copies data to banks and gives ack to memory controller
+            expected_out_if.controller_read_valid[0] = 0;
+            compare_output_interfaces();
+            @(negedge clk); // Cycle 4
+            // dcache responds to load from consumer
+            expected_out_if.consumer_read_ready[0] = 1;
+            expected_out_if.consumer_read_data[0] = 'hFF;
+            compare_output_interfaces();
+            @(negedge clk); // Cycle 5
+            compare_output_interfaces();
+            @(negedge clk); // Cycle 6
+            // dcache stops driving in response to consumer ack
+            expected_out_if.consumer_read_ready[0] = 0;
+            // dcache responds to store from consumer
+            expected_out_if.consumer_write_ready[1] = 1;
+            compare_output_interfaces();
+            @(negedge clk); // Cycle 7
+            // dcache stops driving in response to consumer ack
+            expected_out_if.consumer_write_ready[1] = 0;
+            // dcache responds to load from consumer
+            expected_out_if.consumer_read_ready[0] = 1;
+            expected_out_if.consumer_read_data[0] = 'hF0;
+            compare_output_interfaces();
+            @(negedge clk); // Cycle 8
+            // dcache stops driving in response to consumer ack
+            expected_out_if.consumer_read_ready[0] = 0;
             compare_output_interfaces();
         end
     endtask
