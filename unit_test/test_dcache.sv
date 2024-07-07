@@ -176,6 +176,8 @@ module testbench #(
             @(negedge clk); // Cycle 3
             // dcache copies data to banks and gives ack to memory controller
             expected_out_if.controller_read_valid[1:0] = 0;
+            expected_out_if.controller_read_address[0] = 0;
+            expected_out_if.controller_read_address[1] = 0;
             compare_output_interfaces();
             @(negedge clk); // Cycle 4
             // dcache responds to load and store from consumers
@@ -249,6 +251,7 @@ module testbench #(
             @(negedge clk); // Cycle 3
             // dcache copies data to banks and gives ack to memory controller
             expected_out_if.controller_read_valid[0] = 0;
+            expected_out_if.controller_read_address[0] = 0;
             compare_output_interfaces();
             @(negedge clk); // Cycle 4
             // dcache responds to load from consumer

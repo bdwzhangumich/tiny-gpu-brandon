@@ -135,7 +135,7 @@ module dcache #(
             // dont do anything if still waiting for past eviction to finish
             if (!controller_write_valid[i] || controller_write_ready[i]) begin
                 next_controller_read_valid[i] = !|tag_hits[i] && ((consumer_read_valid[i] && !consumer_read_ready[i]) || (consumer_write_valid[i] && !consumer_write_ready[i]));
-                next_controller_read_address[i] = ({ADDR_BITS{consumer_read_valid[i]}} & consumer_read_address[i]) | ({ADDR_BITS{consumer_write_valid[i]}} & consumer_write_address[i]);
+                next_controller_read_address[i] = next_controller_read_valid[i] ? (({ADDR_BITS{consumer_read_valid[i]}} & consumer_read_address[i]) | ({ADDR_BITS{consumer_write_valid[i]}} & consumer_write_address[i])) : 0;
                 // stop any past evictions
                 next_controller_write_valid[i] = 0;
                 next_controller_write_address[i] = 0;
@@ -172,6 +172,7 @@ module dcache #(
                                 next_controller_write_address[i] = {next_tag_array[bank_indexes[i]][set_indexes[i]][j], bank_indexes[i], set_indexes[i], {$clog2(CACHE_BLOCK_SIZE){1'b0}}};
                                 next_controller_write_data[i] = next_banks[bank_indexes[i]][set_indexes[i]][j];
                                 next_controller_read_valid[i] = 0; // prevent reading and writing at same time on same interface
+                                next_controller_read_address[i] = 0;
                             end
                             break;
                         end
@@ -190,6 +191,7 @@ module dcache #(
                             next_dirtys[bank_indexes[i]][set_indexes[i]][j] = 1;
                         end
                         next_controller_read_valid[i] = 0;
+                        next_controller_read_address[i] = 0;
                         break;
                     end
                 end
