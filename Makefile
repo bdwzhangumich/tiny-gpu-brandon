@@ -11,6 +11,11 @@ unit_test_%:
 	make compile_unit_test_$*
 	vvp build/test_$*.vvp
 
+coverage_unit_test_%:
+	make unit_test_$*
+	covered score -v build/test_$*.v -t testbench -vcd dump.vcd -o $*.ccd
+	covered report -d s -o $*.cov $*.ccd
+
 compile_gpu:
 	make sv2v_alu
 	sv2v -I src/* -w build/gpu.v
