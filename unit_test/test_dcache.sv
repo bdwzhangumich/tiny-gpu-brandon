@@ -89,6 +89,7 @@ module testbench #(
     ) expected_out_if(clk);
 
     initial begin
+        $dumpfile("sim/dcache.vcd");
         $dumpvars(2,data_cache);
         clk = 0;
         failed = 0;

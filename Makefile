@@ -9,12 +9,14 @@ test_%:
 
 unit_test_%:
 	make compile_unit_test_$*
+	mkdir -p sim
 	vvp build/test_$*.vvp
 
+# TODO: figure out why using -i testbench.data_cache -t dcache does not work
 coverage_unit_test_%:
 	make unit_test_$*
-	covered score -v build/test_$*.v -t testbench -vcd dump.vcd -o $*.ccd
-	covered report -d s -o $*.cov $*.ccd
+	covered score -v build/test_$*.v -t testbench -vcd sim/$*.vcd -o sim/$*.ccd
+	covered report -d d -o sim/$*.cov sim/$*.ccd
 
 compile_gpu:
 	make sv2v_alu

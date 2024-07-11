@@ -3,6 +3,7 @@ build/
 test/logs/*
 !.gitkeep
 gds/**/*.gltf
+sim/
 
 .DS_Store
 results.xml
