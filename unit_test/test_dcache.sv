@@ -9,7 +9,9 @@
 `define NUM_WAYS 4
 `define CACHE_BLOCK_SIZE 1
 
-`define half_cycle_length 5
+`define HALF_CYCLE_LENGTH 5
+
+`define RANDOM_TEST_CYCLES 1000
 
 module testbench #(
     parameter ADDR_BITS = `ADDR_BITS,
@@ -24,7 +26,13 @@ module testbench #(
     reg clk;
     reg failed;
     
-    always #`half_cycle_length clk =~ clk;
+    // arrays for tracking what is in cache in random tests
+    reg [NUM_BLOCKS-1:0] valids;
+    reg [NUM_BLOCKS-1:0] addresses [ADDR_BITS-1:0];
+    reg [NUM_BLOCKS-1:0] data [DATA_BITS-1:0];
+
+    always #`HALF_CYCLE_LENGTH clk =~ clk;
+    
     dcache_input_if #(
         .ADDR_BITS(ADDR_BITS),
         .DATA_BITS(DATA_BITS),
@@ -94,25 +102,46 @@ module testbench #(
         clk = 0;
         failed = 0;
 
-        // Test 0
+        // Manual Test 0
         // Tests one load and one store
-        $display("Test 0 begin at Cycle %0t", $time/2/`half_cycle_length);
+        $display("Manual test 0 begin at Cycle %0t", $time/2/`HALF_CYCLE_LENGTH);
         fork
-            test0_driver();
-            test0_scoreboard();
+            manual_test0_driver();
+            manual_test0_scoreboard();
         join
-        $display("Test 0 completed");
+        $display("Manual test 0 completed");
 
-        // TODO: add tests for cache hits, eviction (shouldnt be too hard to force eviction since this cache is set associative)
-
-        // Test 1
+        // Manual Test 1
         // Tests a load, store, and load in sequence and all to the same address
-        $display("Test 1 begin at Cycle %0t", $time/2/`half_cycle_length);
+        $display("Manual test 1 begin at Cycle %0t", $time/2/`HALF_CYCLE_LENGTH);
         fork
-            test1_driver();
-            test1_scoreboard();
+            manual_test1_driver();
+            manual_test1_scoreboard();
         join
-        $display("Test 1 end");
+        $display("Manual test 1 end");
+
+        // TODO: in manual scoreboards, have compare_output_interfaces run in a separate always block
+        // instead of manually at every negedge
+
+        // TODO: add tests where many consumers request at the same time
+        // one test with multiple consumers targeting the same addresses
+        // one test with multiple consumer targeting different blocks in the same set and filling up the set
+        // combinations of the above tests using stores instead of loads
+        
+        // TODO: create random tests
+        // randomly generate requests, give the cache random data from controller
+        // store data given to controller and compare against controller outputs
+        // check that all requests are eventually serviced and that the cache evicts something when it is full
+        // have one test with one requester at a time, then more tests with more requesters
+
+        // Random Test 0
+        // Continuously request random loads through one consumer and provide random data through controller
+        $display("Random test 0 begin at Cycle %0t", $time/2/`HALF_CYCLE_LENGTH);
+        fork
+            random_test0_driver();
+            random_test0_scoreboard();
+        join
+        $display("Random test 0 end");
 
         if (failed === 0)
             $display("Passed!");
@@ -121,7 +150,7 @@ module testbench #(
         $finish;
     end
 
-    task test0_driver;
+    task manual_test0_driver;
         begin
             in_if.reset = 1;
             in_if.consumer_read_valid = 0;
@@ -155,7 +184,7 @@ module testbench #(
         end
     endtask
 
-    task test0_scoreboard;
+    task manual_test0_scoreboard;
         begin
             expected_out_if.consumer_read_ready = 0;
             expected_out_if.consumer_read_data = 0;
@@ -189,7 +218,7 @@ module testbench #(
         end
     endtask
 
-    task test1_driver;
+    task manual_test1_driver;
         begin
             in_if.reset = 1;
             in_if.consumer_read_valid = 0;
@@ -232,7 +261,7 @@ module testbench #(
         end
     endtask
 
-    task test1_scoreboard;
+    task manual_test1_scoreboard;
         begin
             expected_out_if.consumer_read_ready = 0;
             expected_out_if.consumer_read_data = 0;
@@ -281,10 +310,102 @@ module testbench #(
         end
     endtask
 
+    task random_test0_driver;
+        begin
+            in_if.reset = 1;
+            in_if.consumer_read_valid = 0;
+            in_if.consumer_read_address = 0;
+            in_if.consumer_write_valid = 0;
+            in_if.consumer_write_address = 0;
+            in_if.consumer_write_data = 0;
+            in_if.controller_read_ready = 0;
+            in_if.controller_read_data = 0;
+            in_if.controller_write_ready = 0;
+            @(negedge clk); // Cycle 1
+            in_if.reset = 0;
+
+            for(int i = 0; i < `RANDOM_TEST_CYCLES; i++) begin
+                if (!in_if.consumer_read_valid[0] && !out_if.consumer_read_ready[0]) begin
+                    // generate new request
+                    in_if.consumer_read_valid[0] = 1;
+                    // either request an address that is currently in the cache or a new address
+                    if (|valids && $random()[0]) begin
+                        int block = $urandom() % NUM_BLOCKS;
+                        in_if.consumer_read_address[0] = addresses[block];
+                    end
+                    else begin
+                        in_if.consumer_read_address[0] = $random();
+                    end
+                end
+                if (out_if.controller_write_valid[0] && !in_if.controller_write_ready[0]) begin
+                    // remove block
+                    for(int i = 0; i < NUM_BLOCKS; i++) begin
+                        if(addresses[i] = out_if.controller_write_address[0])
+                            valids[i] = 0;
+                    end
+                    in_if.in_if.controller_write_ready[0] = 1; // ack
+                end
+                if (!out_if.controller_write_valid[0] && in_if.controller_write_ready[0])
+                    in_if.controller_write_ready[0] = 0; // ack
+                if (out_if.controller_read_valid[0] && !in_if.controller_read_ready[0]) begin
+                    // add new block
+                    for(int i = 0; i < NUM_BLOCKS; i++)
+                        if(!valids[i]) begin
+                            valids[i] = 1;
+                            addresses[i] = out_if.controller_read_address[0];
+                            data[i] = random();
+                            // give data to cache
+                            in_if.controller_read_ready[0] = 1;
+                            in_if.controller_read_data[0] = data[i];
+                        end
+                end
+                if (!out_if.controller_read_valid[0] && in_if.controller_read_ready[0])
+                    in_if.controller_read_ready[0] = 0; // ack
+                if (in_if.consumer_read_valid[0] && out_if.consumer_read_ready[0])
+                    in_if.consumer_read_valid[0] = 0; // ack read
+                @(negedge clk);
+                #1 // prevent race conditions with scoreboard
+            end
+        end
+    endtask
+
+    task random_test0_scoreboard;
+        begin
+            expected_out_if.consumer_read_ready = 0;
+            expected_out_if.consumer_read_data = 0;
+            expected_out_if.consumer_write_ready = 0;
+            expected_out_if.controller_read_valid = 0;
+            expected_out_if.controller_read_address = 0;
+            expected_out_if.controller_write_valid = 0;
+            expected_out_if.controller_write_address = 0;
+            expected_out_if.controller_write_data = 0;
+            @(negedge clk); // Cycle 1
+            compare_output_interfaces();
+            @(negedge clk); // Cycle 2
+
+            // variables for checking if any part of a request is taking too long
+            num_consumer_ack_cycles = 0;
+            num_consumer_request_cycles = 0; // TODO: implement logic to detect how long a single request is ongoing and set failed if it takes too long
+            // TODO: check that consumer responses and controller writes have correct values and addresses
+            // TODO: check that controller reads have correct addresses and are only for addresses not in cache
+            for(int i = 0; i < `RANDOM_TEST_CYCLES; i++) begin
+                if (in_if.consumer_read_valid[0] && !out_if.consumer_read_ready[0])
+                    num_consumer_ack_cycles = 0;
+                // TODO: could the consumer read check have a race condition with the driver?
+                // if not, remove delay from driver. if delay does not work, figure out what will
+                if (!in_if.consumer_read_valid[0] && out_if.consumer_read_ready[0])
+                    num_consumer_ack_cycles++;
+                if (num_consumer_ack_cycles > `RANDOM_TEST_CYCLES / 4)
+                    failed = 1; // something is probably wrong if half of cycles are delays
+                @(negedge clk);
+            end
+        end
+    endtask
+
     `define compare_expected(port) if (out_if.``port`` !== expected_out_if.``port``) begin \
                 $display ( \
                     "Failure at Cycle %0t: %s=0x%0h expected_%s=0x%0h", \
-                    $time/2/`half_cycle_length, \
+                    $time/2/`HALF_CYCLE_LENGTH, \
                     `"port`", \
                     out_if.``port``, \
                     `"port`", \
