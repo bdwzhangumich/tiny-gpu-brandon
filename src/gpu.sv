@@ -11,9 +11,9 @@ module gpu #(
     parameter DATA_MEM_ADDR_BITS = 8,        // Number of bits in data memory address (256 rows)
     parameter DATA_MEM_DATA_BITS = 8,        // Number of bits in data memory value (8 bit data)
     parameter DATA_MEM_NUM_CHANNELS = 4,     // Number of concurrent channels for sending requests to data memory
-    parameter NUM_BLOCKS = 2, // The number of blocks in the cache
+    parameter NUM_BLOCKS = 8, // The number of blocks in the cache
     parameter NUM_BANKS = 2, // The number of banks in the cache
-    parameter NUM_WAYS = 1, // The associativity of the cache
+    parameter NUM_WAYS = 4, // The associativity of the cache
     parameter CACHE_BLOCK_SIZE = 1, // The number of bytes each cache block should be
     parameter PROGRAM_MEM_ADDR_BITS = 8,     // Number of bits in program memory address (256 rows)
     parameter PROGRAM_MEM_DATA_BITS = 16,    // Number of bits in program memory value (16 bit instruction)
