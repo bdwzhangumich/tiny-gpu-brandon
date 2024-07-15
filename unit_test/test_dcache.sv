@@ -383,20 +383,24 @@ module testbench #(
             compare_output_interfaces();
             @(negedge clk); // Cycle 2
 
-            // variables for checking if any part of a request is taking too long
-            num_consumer_ack_cycles = 0;
-            num_consumer_request_cycles = 0; // TODO: implement logic to detect how long a single request is ongoing and set failed if it takes too long
             // TODO: check that consumer responses and controller writes have correct values and addresses
             // TODO: check that controller reads have correct addresses and are only for addresses not in cache
+
+            // TODO: could the cache data checks have race conditions with the driver?
+            // if not, remove delay from driver. if delay does not work, figure out why
+            int consumer_read_timer = 0;
             for(int i = 0; i < `RANDOM_TEST_CYCLES; i++) begin
-                if (in_if.consumer_read_valid[0] && !out_if.consumer_read_ready[0])
-                    num_consumer_ack_cycles = 0;
-                // TODO: could the consumer read check have a race condition with the driver?
-                // if not, remove delay from driver. if delay does not work, figure out what will
-                if (!in_if.consumer_read_valid[0] && out_if.consumer_read_ready[0])
-                    num_consumer_ack_cycles++;
-                if (num_consumer_ack_cycles > `RANDOM_TEST_CYCLES / 4)
-                    failed = 1; // something is probably wrong if half of cycles are delays
+                if (!out_if.consumer_read_ready[0])
+                    consumer_read_timer++;
+                if (out_if.consumer_read_ready[0]) begin
+                    consumer_read_timer = 0;
+                end
+                
+                if (consumer_read_timer > `RANDOM_TEST_CYCLES / 4) begin
+                    failed = 1;
+                    $display("Consumer read timed out");
+                    break;
+                end
                 @(negedge clk);
             end
         end
