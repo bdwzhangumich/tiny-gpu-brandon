@@ -34,9 +34,7 @@ compile_unit_test_%:
 sv2v_%:
 	sv2v -w build/$*.v src/$*.sv
 
-# TODO: Get gtkwave visualizaiton
-
-show_%: %.vcd %.gtkw
+show_%: sim/%.vcd
 	gtkwave $^
 
 clean:
