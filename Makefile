@@ -38,3 +38,6 @@ sv2v_%:
 
 show_%: %.vcd %.gtkw
 	gtkwave $^
+
+clean:
+	rm build/* sim/*
