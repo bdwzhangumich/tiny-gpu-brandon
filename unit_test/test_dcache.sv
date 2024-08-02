@@ -318,6 +318,10 @@ module testbench #(
 
     task random_test0_driver;
         begin
+            valids = 0;
+            addresses = 0;
+            data = 0;
+
             in_if.reset = 1;
             in_if.consumer_read_valid = 0;
             in_if.consumer_read_address = 0;
