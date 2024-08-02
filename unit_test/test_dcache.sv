@@ -111,7 +111,7 @@ module testbench #(
             manual_test0_driver();
             manual_test0_scoreboard();
         join
-        $display("Manual test 0 completed");
+        $display("Manual test 0 end");
 
         // Manual Test 1
         // Tests a load, store, and load in sequence and all to the same address
@@ -151,6 +151,7 @@ module testbench #(
         join
         $display("Random test 0 end");
 
+        $display("Finished at Cycle %0t", $time/2/`HALF_CYCLE_LENGTH);
         $display("Passed!");
         $finish;
     end
@@ -317,7 +318,7 @@ module testbench #(
 
     `define compare_expected(port) if (out_if.``port`` !== expected_out_if.``port``) begin \
                 $display ( \
-                    "Failure at Cycle %0t: %s=0x%0h expected_%s=0x%0h", \
+                    "Failure at Cycle %0t: %s=0x%0h expected_out_if.%s=0x%0h", \
                     $time/2/`HALF_CYCLE_LENGTH, \
                     `"port`", \
                     out_if.``port``, \
@@ -378,6 +379,7 @@ module testbench #(
                             // give data to cache
                             in_if.controller_read_ready[0] = 1;
                             in_if.controller_read_data[0] = data[i];
+                            break;
                         end
                 end
                 if (!out_if.controller_read_valid[0] && in_if.controller_read_ready[0])
