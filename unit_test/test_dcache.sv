@@ -33,6 +33,8 @@ module testbench #(
 
     always #`HALF_CYCLE_LENGTH clk =~ clk;
     
+    always @(*) if(failed === 1) $fatal(1, "Failed!");
+
     dcache_input_if #(
         .ADDR_BITS(ADDR_BITS),
         .DATA_BITS(DATA_BITS),
@@ -149,10 +151,7 @@ module testbench #(
         join
         $display("Random test 0 end");
 
-        if (failed === 0)
-            $display("Passed!");
-        else
-            $display("Failed!");
+        $display("Passed!");
         $finish;
     end
 
@@ -316,6 +315,18 @@ module testbench #(
         end
     endtask
 
+    `define compare_expected(port) if (out_if.``port`` !== expected_out_if.``port``) begin \
+                $display ( \
+                    "Failure at Cycle %0t: %s=0x%0h expected_%s=0x%0h", \
+                    $time/2/`HALF_CYCLE_LENGTH, \
+                    `"port`", \
+                    out_if.``port``, \
+                    `"port`", \
+                    expected_out_if.``port`` \
+                ); \
+                failed = 1; \
+            end
+
     task random_test0_driver;
         begin
             valids = 0;
@@ -407,36 +418,22 @@ module testbench #(
                     // TODO: check that consumer responses have correct values and addresses
                     for(int i = 0; i < NUM_BLOCKS; i++ ) begin
                         if(valids[i] && addresses[i] == in_if.consumer_read_address[0]) begin
-                            if (data[i] != out_if.consumer_read_data[0]) begin
-                                failed = 1;
-                                $display("Consumer read gave incorrect data");
-                            end
+                            expected_out_if.consumer_read_data[0] = data[i];
+                            `compare_expected(consumer_read_data);
                         end
                         // TODO: do I need to check if address was found?
                     end
                 end
                 
                 if (consumer_read_timer > `RANDOM_TEST_CYCLES / 4) begin
-                    failed = 1;
                     $display("Consumer read timed out");
-                    break;
+                    failed = 1;
                 end
                 @(negedge clk);
             end
         end
     endtask
 
-    `define compare_expected(port) if (out_if.``port`` !== expected_out_if.``port``) begin \
-                $display ( \
-                    "Failure at Cycle %0t: %s=0x%0h expected_%s=0x%0h", \
-                    $time/2/`HALF_CYCLE_LENGTH, \
-                    `"port`", \
-                    out_if.``port``, \
-                    `"port`", \
-                    expected_out_if.``port`` \
-                ); \
-                failed = 1; \
-            end
     task compare_output_interfaces;
         begin
             failed = 0;
