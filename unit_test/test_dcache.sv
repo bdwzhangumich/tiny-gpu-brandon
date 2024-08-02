@@ -33,7 +33,10 @@ module testbench #(
 
     always #`HALF_CYCLE_LENGTH clk =~ clk;
     
-    always @(*) if(failed === 1) $fatal(1, "Failed!");
+    always @(*) if(failed === 1) begin
+        $display("Stopped at Cycle %0t", $time/2/`HALF_CYCLE_LENGTH);
+        $fatal(1, "Failed!");
+    end
 
     dcache_input_if #(
         .ADDR_BITS(ADDR_BITS),
@@ -392,6 +395,7 @@ module testbench #(
         end
     endtask
     int consumer_read_timer;
+    bit found;
     task random_test0_scoreboard;
         begin
             expected_out_if.consumer_read_ready = 0;
@@ -406,27 +410,41 @@ module testbench #(
             compare_output_interfaces();
             @(negedge clk); // Cycle 2
 
-            // TODO: check that controller writes have correct values and addresses
+            // TODO: figure out how to increase length of valids, addresses, and data arrays
+            // to account for clean blocks which may have been evicted without being written to memory 
+            // TODO: figure out why only two blocks are being used when running this test
             // TODO: check that controller reads have correct addresses and are only for addresses not in cache
 
             // TODO: could the cache data checks have race conditions with the driver?
-            // if not, remove delay from driver. if delay does not work, figure out why
+            // if not, remove delay from driver.
             consumer_read_timer = 0;
             for(int i = 0; i < `RANDOM_TEST_CYCLES; i++) begin
                 if (!out_if.consumer_read_ready[0])
                     consumer_read_timer++;
                 if (out_if.consumer_read_ready[0]) begin
                     consumer_read_timer = 0;
-                    // TODO: check that consumer responses have correct values and addresses
                     for(int i = 0; i < NUM_BLOCKS; i++ ) begin
                         if(valids[i] && addresses[i] == in_if.consumer_read_address[0]) begin
                             expected_out_if.consumer_read_data[0] = data[i];
                             `compare_expected(consumer_read_data);
                         end
-                        // TODO: do I need to check if address was found?
                     end
                 end
-                
+                if (out_if.controller_write_valid[0]) begin
+                    // not used in test0 because no stores so no dirty blocks
+                    found = 0;
+                    for(int i = 0; i < NUM_BLOCKS; i++) begin
+                        if(valids[i] && addresses[i] == out_if.controller_write_address[0]) begin
+                            found = 1;
+                            expected_out_if.controller_write_data[0] = data[i];
+                            `compare_expected(controller_write_data);
+                        end
+                    end
+                    if (!found) begin
+                        $display("Controller write address 0x%0h not found in addresses", out_if.controller_write_address[0]);
+                        failed = 1;
+                    end
+                end
                 if (consumer_read_timer > `RANDOM_TEST_CYCLES / 4) begin
                     $display("Consumer read timed out");
                     failed = 1;
