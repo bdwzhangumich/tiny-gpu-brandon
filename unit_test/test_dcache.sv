@@ -134,6 +134,12 @@ module testbench #(
         // check that all requests are eventually serviced and that the cache evicts something when it is full
         // have one test with one requester at a time, then more tests with more requesters
 
+        // TODO: add asserts
+        // dcache does not request controller reads and writes at the same time
+        // dcache does not output read and write ready bits at same time
+
+        // TODO: use asserts instead of $display?
+
         // Random Test 0
         // Continuously request random loads through one consumer and provide random data through controller
         $display("Random test 0 begin at Cycle %0t", $time/2/`HALF_CYCLE_LENGTH);
@@ -329,7 +335,7 @@ module testbench #(
                     // generate new request
                     in_if.consumer_read_valid[0] = 1;
                     // either request an address that is currently in the cache or a new address
-                    if (|valids && $random()[0]) begin
+                    if (|valids && $random()) begin
                         int block = $urandom() % NUM_BLOCKS;
                         in_if.consumer_read_address[0] = addresses[block];
                     end
@@ -340,7 +346,7 @@ module testbench #(
                 if (out_if.controller_write_valid[0] && !in_if.controller_write_ready[0]) begin
                     // remove block
                     for(int i = 0; i < NUM_BLOCKS; i++) begin
-                        if(addresses[i] = out_if.controller_write_address[0])
+                        if(addresses[i] == out_if.controller_write_address[0])
                             valids[i] = 0;
                     end
                     in_if.in_if.controller_write_ready[0] = 1; // ack
@@ -353,7 +359,7 @@ module testbench #(
                         if(!valids[i]) begin
                             valids[i] = 1;
                             addresses[i] = out_if.controller_read_address[0];
-                            data[i] = random();
+                            data[i] = $random();
                             // give data to cache
                             in_if.controller_read_ready[0] = 1;
                             in_if.controller_read_data[0] = data[i];
@@ -364,11 +370,11 @@ module testbench #(
                 if (in_if.consumer_read_valid[0] && out_if.consumer_read_ready[0])
                     in_if.consumer_read_valid[0] = 0; // ack read
                 @(negedge clk);
-                #1 // prevent race conditions with scoreboard
+                #1; // prevent race conditions with scoreboard
             end
         end
     endtask
-
+    int consumer_read_timer;
     task random_test0_scoreboard;
         begin
             expected_out_if.consumer_read_ready = 0;
@@ -383,17 +389,27 @@ module testbench #(
             compare_output_interfaces();
             @(negedge clk); // Cycle 2
 
-            // TODO: check that consumer responses and controller writes have correct values and addresses
+            // TODO: check that controller writes have correct values and addresses
             // TODO: check that controller reads have correct addresses and are only for addresses not in cache
 
             // TODO: could the cache data checks have race conditions with the driver?
             // if not, remove delay from driver. if delay does not work, figure out why
-            int consumer_read_timer = 0;
+            consumer_read_timer = 0;
             for(int i = 0; i < `RANDOM_TEST_CYCLES; i++) begin
                 if (!out_if.consumer_read_ready[0])
                     consumer_read_timer++;
                 if (out_if.consumer_read_ready[0]) begin
                     consumer_read_timer = 0;
+                    // TODO: check that consumer responses have correct values and addresses
+                    for(int i = 0; i < NUM_BLOCKS; i++ ) begin
+                        if(valids[i] && addresses[i] == in_if.consumer_read_address[0]) begin
+                            if (data[i] != out_if.consumer_read_data[0]) begin
+                                failed = 1;
+                                $display("Consumer read gave incorrect data");
+                            end
+                        end
+                        // TODO: do I need to check if address was found?
+                    end
                 end
                 
                 if (consumer_read_timer > `RANDOM_TEST_CYCLES / 4) begin
