@@ -27,9 +27,10 @@ module testbench #(
     reg failed;
     
     // arrays for tracking what is in cache in random tests
-    reg [NUM_BLOCKS-1:0] valids;
-    reg [NUM_BLOCKS-1:0] addresses [ADDR_BITS-1:0];
-    reg [NUM_BLOCKS-1:0] data [DATA_BITS-1:0];
+    int blocks_given;
+    reg [`RANDOM_TEST_CYCLES-1:0] valids;
+    reg [`RANDOM_TEST_CYCLES-1:0] addresses [ADDR_BITS-1:0];
+    reg [`RANDOM_TEST_CYCLES-1:0] data [DATA_BITS-1:0];
 
     always #`HALF_CYCLE_LENGTH clk =~ clk;
     
@@ -333,6 +334,7 @@ module testbench #(
 
     task random_test0_driver;
         begin
+            blocks_given = 0;
             valids = 0;
             addresses = 0;
             data = 0;
@@ -357,7 +359,7 @@ module testbench #(
                     if (|valids && $urandom() % 2) begin
                         int block = -1;
                         while(block == -1 || !valids[block])
-                            block = $urandom() % NUM_BLOCKS;
+                            block = $urandom() % blocks_given;
                         in_if.consumer_read_address[0] = addresses[block];
                     end
                     else begin
@@ -366,7 +368,7 @@ module testbench #(
                 end
                 if (out_if.controller_write_valid[0] && !in_if.controller_write_ready[0]) begin
                     // remove block
-                    for(int i = 0; i < NUM_BLOCKS; i++) begin
+                    for(int i = 0; i < blocks_given; i++) begin
                         if(addresses[i] == out_if.controller_write_address[0])
                             valids[i] = 0;
                     end
@@ -375,17 +377,24 @@ module testbench #(
                 if (!out_if.controller_write_valid[0] && in_if.controller_write_ready[0])
                     in_if.controller_write_ready[0] = 0; // ack
                 if (out_if.controller_read_valid[0] && !in_if.controller_read_ready[0]) begin
-                    // add new block
-                    for(int i = 0; i < NUM_BLOCKS; i++)
-                        if(!valids[i]) begin
-                            valids[i] = 1;
-                            addresses[i] = out_if.controller_read_address[0];
-                            data[i] = $random();
-                            // give data to cache
+                    for(int i = 0; i < blocks_given; i++)
+                        if(valids[i] && addresses[i] == out_if.controller_read_address[0]) begin
+                            // give previously evicted data to cache again
                             in_if.controller_read_ready[0] = 1;
                             in_if.controller_read_data[0] = data[i];
                             break;
                         end
+                    if (!in_if.controller_read_ready[0]) begin
+                        // add new block
+                        valids[blocks_given] = 1;
+                        addresses[blocks_given] = out_if.controller_read_address[0];
+                        data[blocks_given] = $random();
+                        // give data to cache
+                        in_if.controller_read_ready[0] = 1;
+                        in_if.controller_read_data[0] = data[blocks_given];
+                        blocks_given++;
+                        break;
+                    end
                 end
                 if (!out_if.controller_read_valid[0] && in_if.controller_read_ready[0])
                     in_if.controller_read_ready[0] = 0; // ack
@@ -412,9 +421,7 @@ module testbench #(
             compare_output_interfaces();
             @(negedge clk); // Cycle 2
 
-            // TODO: figure out how to increase length of valids, addresses, and data arrays
-            // to account for clean blocks which may have been evicted without being written to memory
-            // TODO: check that controller reads have correct addresses and are only for addresses not in cache
+            // TODO: check that controller reads have correct addresses
 
             // TODO: could the cache data checks have race conditions with the driver?
             // if not, remove delay from driver.
@@ -424,7 +431,7 @@ module testbench #(
                     consumer_read_timer++;
                 if (out_if.consumer_read_ready[0]) begin
                     consumer_read_timer = 0;
-                    for(int i = 0; i < NUM_BLOCKS; i++ ) begin
+                    for(int i = 0; i < blocks_given; i++ ) begin
                         if(valids[i] && addresses[i] == in_if.consumer_read_address[0]) begin
                             expected_out_if.consumer_read_data[0] = data[i];
                             `compare_expected(consumer_read_data);
@@ -434,7 +441,7 @@ module testbench #(
                 if (out_if.controller_write_valid[0]) begin
                     // not used in test0 because no stores so no dirty blocks
                     found = 0;
-                    for(int i = 0; i < NUM_BLOCKS; i++) begin
+                    for(int i = 0; i < blocks_given; i++) begin
                         if(valids[i] && addresses[i] == out_if.controller_write_address[0]) begin
                             found = 1;
                             expected_out_if.controller_write_data[0] = data[i];
