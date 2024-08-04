@@ -140,11 +140,9 @@ module testbench #(
         // check that all requests are eventually serviced and that the cache evicts something when it is full
         // have one test with one requester at a time, then more tests with more requesters
 
-        // TODO: add asserts
+        // TODO: add always ongoing checks (not asserts because cant use asserts with sv2v)
         // dcache does not request controller reads and writes at the same time
         // dcache does not output read and write ready bits at same time
-
-        // TODO: use asserts instead of $display?
 
         // Random Test 0
         // Continuously request random loads through one consumer and provide random data through controller
