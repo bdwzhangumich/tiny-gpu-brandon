@@ -354,8 +354,10 @@ module testbench #(
                     // generate new request
                     in_if.consumer_read_valid[0] = 1;
                     // either request an address that is currently in the cache or a new address
-                    if (|valids && $random()) begin
-                        int block = $urandom() % NUM_BLOCKS;
+                    if (|valids && $urandom() % 2) begin
+                        int block = -1;
+                        while(block == -1 || !valids[block])
+                            block = $urandom() % NUM_BLOCKS;
                         in_if.consumer_read_address[0] = addresses[block];
                     end
                     else begin
@@ -411,8 +413,7 @@ module testbench #(
             @(negedge clk); // Cycle 2
 
             // TODO: figure out how to increase length of valids, addresses, and data arrays
-            // to account for clean blocks which may have been evicted without being written to memory 
-            // TODO: figure out why only two blocks are being used when running this test
+            // to account for clean blocks which may have been evicted without being written to memory
             // TODO: check that controller reads have correct addresses and are only for addresses not in cache
 
             // TODO: could the cache data checks have race conditions with the driver?
