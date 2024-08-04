@@ -126,6 +126,7 @@ module dcache #(
         next_banks = banks;
         next_mrus = mrus;
 
+        modified = 0;
         next_controller_read_valid = 0;
         next_controller_read_address = 0;
         next_controller_write_valid = controller_write_valid;
